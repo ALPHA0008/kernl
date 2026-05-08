@@ -13,4 +13,4 @@ Our refund policy is designed to balance customer satisfaction with revenue rete
 - **Monthly Plans (New Customers):** If a customer on a monthly plan with a tenure of less than 3 months requests a refund over $500, escalate to the Founder.
 
 ## 3. Strict Time Limits
-**CRITICAL:** We offer absolutely no refunds after 30 days of purchase for any customer tier. If the purchase was more than 30 days ago, deny the refund.
+**CRITICAL:** We offer absolutely no refunds after 60 days of purchase for any customer tier. If the purchase was more than 60 days ago, deny the refund.

@@ -45,3 +45,14 @@ data/sources/*/
 brand_alchemy_company_brain.html
 company_brain_PRD_v4.md
 
+# Claude Code session files (never commit these)
+session-ses*.md
+
+# Windows artifacts
+nul
+backend/nul
+
+# Logs
+backend_log.txt
+*.log
+

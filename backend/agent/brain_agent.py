@@ -1,25 +1,27 @@
 import json
+import numpy as np
 from backend.db.supabase import get_client
-from backend.llm import llm_call, get_embedding, cosine_similarity
+from backend.llm import llm_call, get_embedding
 
 
-async def handle_agent_query(company_id: str, scenario: str, context: dict = None, with_brain: bool = True) -> dict:
-    """
-    Real agent query handler.  No keyword routing, no hardcoded actions.
-    Everything flows through: retrieve skills -> build prompt -> call vLLM -> return raw result.
-    """
+async def handle_agent_query(
+    company_id: str, scenario: str, context: dict = None, with_brain: bool = True
+) -> dict:
     if not with_brain:
         return await _baseline_query(scenario, context)
 
-    # --- WITH BRAIN ---
     db = get_client()
     if not db:
         return _error_response("Database connection failed.")
 
-    # 1. Fetch latest compiled skills
-    res = db.table("skills_files").select("brain_json").eq(
-        "company_id", company_id
-    ).order("compiled_at", desc=True).limit(1).execute()
+    res = (
+        db.table("skills_files")
+        .select("brain_json")
+        .eq("company_id", company_id)
+        .order("compiled_at", desc=True)
+        .limit(1)
+        .execute()
+    )
 
     if not res.data:
         return _error_response("No compiled brain found. Please compile first.")
@@ -28,58 +30,108 @@ async def handle_agent_query(company_id: str, scenario: str, context: dict = Non
     if not skills:
         return _error_response("Brain is empty — no skills compiled.")
 
-    # 2. Embed the query and score every skill
     query_text = f"{scenario} {json.dumps(context or {})}"
     query_emb = get_embedding(query_text)
 
-    scored = []
-    for i, skill in enumerate(skills):
-        skill_text = f"{skill.get('category', '')} {skill.get('rule', '')} {skill.get('rationale', '')}"
-        skill_emb = get_embedding(skill_text)
-        score = cosine_similarity(query_emb, skill_emb)
-        scored.append({"skill": skill, "score": round(score, 4), "index": i})
+    cached = True
+    for s in skills:
+        if "embedding_vector" not in s:
+            cached = False
+            break
+
+    if cached:
+        skill_embs = np.array([s["embedding_vector"] for s in skills])
+        query_vec = np.array(query_emb)
+        norms = np.linalg.norm(skill_embs, axis=1) * np.linalg.norm(query_vec)
+        norms[norms == 0] = 1e-10
+        scores = np.dot(skill_embs, query_vec) / norms
+        top_indices = np.argsort(scores)[-5:][::-1]
+        scored = []
+        for idx in top_indices:
+            scored.append(
+                {
+                    "skill": skills[idx],
+                    "score": round(float(scores[idx]), 4),
+                    "index": int(idx),
+                }
+            )
+    else:
+        scored = []
+        for i, skill in enumerate(skills):
+            skill_text = f"{skill.get('category', '')} {skill.get('rule', '')} {skill.get('rationale', '')}"
+            skill_emb = get_embedding(skill_text)
+            score = float(
+                np.dot(query_emb, skill_emb)
+                / (np.linalg.norm(query_emb) * np.linalg.norm(skill_emb) + 1e-10)
+            )
+            scored.append({"skill": skill, "score": round(score, 4), "index": i})
 
     scored.sort(key=lambda x: x["score"], reverse=True)
     top_results = scored[:5]
     retrieval_scores = [s["score"] for s in top_results]
 
-    # 3. Build skills context for the LLM
     skills_context = ""
     for rank, s in enumerate(top_results):
         sk = s["skill"]
-        skills_context += f"\n--- Skill #{rank+1} (retrieval_score: {s['score']}) ---\n"
+        skills_context += (
+            f"\n--- Skill #{rank + 1} (retrieval_score: {s['score']}) ---\n"
+        )
         skills_context += f"Category: {sk.get('category', 'Unknown')}\n"
         skills_context += f"Rule: {sk.get('rule', '')}\n"
         skills_context += f"Rationale: {sk.get('rationale', '')}\n"
-        skills_context += f"Evidence: {json.dumps(sk.get('evidence', []))}\n"
+        evidence = sk.get("evidence", [])
+        if isinstance(evidence, list):
+            skills_context += f"Evidence: {json.dumps(evidence[:3])}\n"
         skills_context += f"Compiled Confidence: {sk.get('confidence', 'unknown')}\n"
 
-    # 4. Prompt the LLM - no example confidence values to bias it
-    prompt = """You are the Kernl Brain Agent. You have access to this company's compiled operational skills (retrieved below, ranked by relevance).
+    prompt = """You are a logical policy reasoning engine. Your ONLY job is to compare scenario parameters against rule thresholds using pure arithmetic, then output the correct action.
 
-Your task:
-1. Read the scenario and optional JSON context carefully.
-2. Examine the retrieved skills and their retrieval_scores.
-3. Determine whether any skill clearly applies to this scenario.
-4. If a skill applies, state the specific recommended action from that skill's rule.
-5. If NO skill applies, or if the input is nonsensical/gibberish, say so honestly.
+CRITICAL LANGUAGE INTERPRETATION RULES:
+- "No refunds after X days" means: refunds ARE allowed if the scenario is BEFORE X days. The word "after" creates a threshold at X. Below X = allowed. Above X = denied.
+- "Full refund within X days" means: refunds are allowed ONLY if scenario is WITHIN X days. Below X = allowed. Above X = denied.
+- "No refunds for X" (without a threshold) is an absolute ban.
 
-CONFIDENCE SCORING - base it on real signals:
-- retrieval_score < 0.3 -> scenario is likely unrelated to any skill -> confidence < 0.2
-- retrieval_score 0.3-0.5 -> weak match -> confidence 0.2-0.5
-- retrieval_score 0.5-0.7 -> moderate match -> confidence 0.5-0.75
-- retrieval_score > 0.7 AND rule clearly addresses the scenario -> confidence 0.75-0.95
-- Never exceed 0.95 unless the match is exact and unambiguous.
-- Gibberish or nonsensical input -> confidence 0.0, recommended_action = "unable to determine"
+ALWAYS compute: does the scenario value fall on the ALLOWED side or the DENIED side of the threshold?
 
-Respond with ONLY a JSON object (no markdown fences, no text outside the JSON):
+Follow these exact steps:
+STEP 1: Extract numeric thresholds from the matched rule (e.g., "60 days" → 60).
+STEP 2: Extract the corresponding parameter from the scenario (e.g., days_since_purchase=45).
+STEP 3: COMPARE: Write the comparison explicitly (e.g., "45 < 60, so customer is BEFORE the threshold").
+STEP 4: DECIDE based solely on the comparison outcome.
+
+Example A:
+  Rule: "No refunds after 60 days. If purchase was more than 60 days ago, deny."
+  Scenario: days_since_purchase=45
+  STEP 1: threshold = 60 days
+  STEP 2: scenario = 45 days
+  STEP 3: 45 < 60, customer is BEFORE the threshold
+  STEP 4: Action = approve (customer qualifies under 60-day limit)
+
+Example B:
+  Rule: "Full refund only within 14 days of purchase"
+  Scenario: days_since_purchase=45
+  STEP 1: threshold = 14 days
+  STEP 2: scenario = 45 days
+  STEP 3: 45 > 14, customer is AFTER the threshold
+  STEP 4: Action = deny (outside the refund window)
+
+Your recommended_action MUST exactly match what the math says. Do not let the emotional tone of the rule ("absolutely no", "no exceptions") override the arithmetic threshold.
+
+confidence:
+- retrieval_score < 0.3 → 0.0-0.2 (unrelated)
+- 0.3-0.5 → 0.2-0.5 (weak)
+- 0.5-0.7 → 0.5-0.75 (moderate)
+- > 0.7 and correct match → 0.75-0.95 (strong)
+- gibberish → 0.0
+
+Respond with ONLY this JSON:
 {
-  "recommended_action": "the specific action to take",
-  "rule_applied": "exact rule text from the best matching skill",
-  "evidence": ["evidence items from the skill"],
-  "skill_matched": "the category of the matched skill",
+  "recommended_action": "action based on your math comparison",
+  "rule_applied": "exact rule text from best matching skill",
+  "evidence": ["evidence items"],
+  "skill_matched": "skill category",
   "confidence": 0.0,
-  "reasoning": "explain why this skill applies and how you chose the confidence level"
+  "reasoning": "STEP 1: [threshold] STEP 2: [scenario value] STEP 3: [numeric comparison] STEP 4: [action]"
 }"""
 
     user_content = f"--- Scenario ---\n{scenario}\n\n--- Additional Context ---\n{json.dumps(context or {})}\n\n--- Retrieved Skills (ranked by relevance) ---\n{skills_context}"
@@ -87,11 +139,11 @@ Respond with ONLY a JSON object (no markdown fences, no text outside the JSON):
     response_str = await llm_call(prompt, user_content)
     result = _parse_json(response_str)
     result["retrieval_scores"] = retrieval_scores
+    result["cached_embedding"] = cached
     return result
 
 
 async def _baseline_query(scenario: str, context: dict = None) -> dict:
-    """Without-brain baseline: LLM answers with zero company context."""
     prompt = """You are a generic AI assistant. You have NO company-specific knowledge or policies.
 Answer based only on general industry standards. Be honest about your lack of specific context.
 Respond with ONLY a JSON object:
@@ -110,7 +162,6 @@ Respond with ONLY a JSON object:
 
 
 def _parse_json(raw: str) -> dict:
-    """Parse LLM response as JSON, stripping markdown fences."""
     try:
         clean = raw.strip()
         if clean.startswith("```json"):
@@ -128,7 +179,7 @@ def _parse_json(raw: str) -> dict:
             "skill_matched": "none",
             "confidence": 0.0,
             "retrieval_scores": [],
-            "reasoning": f"JSON parse error: {e}. Raw: {raw[:500]}"
+            "reasoning": f"JSON parse error: {e}. Raw: {raw[:500]}",
         }
 
 
@@ -140,5 +191,5 @@ def _error_response(msg: str) -> dict:
         "skill_matched": "none",
         "confidence": 0.0,
         "retrieval_scores": [],
-        "reasoning": msg
+        "reasoning": msg,
     }

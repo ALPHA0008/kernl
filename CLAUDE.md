@@ -14,35 +14,49 @@ Company Brain is a multi-agent compilation pipeline that extracts operational de
 ## Monorepo Structure
 
 ```
-company-brain/
+kernl/
 ├── backend/              ← FastAPI + LangGraph pipeline (Python)
 │   ├── main.py           ← FastAPI app entry point
+│   ├── llm.py            ← vLLM client, semaphore(4), embeddings, JSON self-repair
+│   ├── sse.py            ← Server-Sent Events bus for streaming
+│   ├── test_compile.py   ← Standalone graph test
 │   ├── graph/
 │   │   ├── state.py      ← BrainState TypedDict
-│   │   ├── nodes/        ← one file per LangGraph node
-│   │   │   ├── ingest_slack.py
-│   │   │   ├── ingest_notion.py
-│   │   │   ├── ingest_tickets.py
-│   │   │   ├── ingest_join.py
-│   │   │   ├── extract_decisions.py
-│   │   │   ├── extract_workflows.py
-│   │   │   ├── extract_exceptions.py
-│   │   │   ├── detect_contradictions.py
-│   │   │   ├── synthesize_skills.py
-│   │   │   ├── link_evidence.py
-│   │   │   ├── score_confidence.py
-│   │   │   └── write_brain.py
-│   │   └── graph.py      ← graph assembly + compile
-│   ├── agents/
-│   │   └── brain_agent.py ← query-time brain agent
+│   │   ├── graph.py      ← graph assembly + compile
+│   │   └── nodes/        ← one file per LangGraph node
+│   │       ├── load_sources.py
+│   │       ├── ingest_slack.py
+│   │       ├── ingest_notion.py
+│   │       ├── ingest_tickets.py
+│   │       ├── ingest_join.py
+│   │       ├── extract_decisions.py
+│   │       ├── extract_workflows.py
+│   │       ├── extract_exceptions.py
+│   │       ├── detect_contradictions.py
+│   │       ├── synthesize_skills.py
+│   │       ├── link_evidence.py
+│   │       ├── score_confidence.py
+│   │       └── write_brain.py
+│   ├── agent/
+│   │   └── brain_agent.py ← query-time brain agent (embedding + LLM reasoning)
 │   ├── db/
-│   │   └── supabase.py   ← Supabase client + queries
+│   │   ├── supabase.py   ← Supabase client + queries
+│   │   └── schema.sql    ← DB schema (5 tables)
 │   ├── models/
 │   │   └── schemas.py    ← Pydantic models for API
-│   └── requirements.txt
-├── frontend/             ← Next.js 14 + Tailwind (Harshit)
+│   ├── requirements.txt
+│   └── .env.example
+├── frontend/             ← Next.js 16.2.5 + Tailwind v4
+│   ├── src/app/
+│   │   ├── page.tsx          ← Dashboard
+│   │   ├── layout.tsx        ← Root layout
+│   │   ├── globals.css       ← Tailwind + custom theme
+│   │   ├── compile/[jobId]/page.tsx   ← Pipeline stream viewer
+│   │   ├── skills/[companyId]/page.tsx ← Skills viewer
+│   │   └── demo/[companyId]/page.tsx  ← Brain vs Generic A/B comparison
+│   └── ...
 ├── data/
-│   └── sources/          ← 8 synthetic source files
+│   └── sources/rivanly-inc/  ← 8 synthetic source files
 │       ├── notion_refund_sop.md
 │       ├── notion_pricing_policy.md
 │       ├── notion_eng_runbook.md
@@ -51,8 +65,13 @@ company-brain/
 │       ├── slack_export_support.json
 │       ├── slack_export_ops.json
 │       └── zendesk_tickets.json
-└── CLAUDE.md             ← this file
+├── scripts/
+│   ├── smoke_test.py     ← Dynamic policy change propagation test
+│   └── stress_test.py    ← Resilience test (malformed input, contradictions)
+├── CLAUDE.md             ← this file
+└── .gitignore
 ```
+**Note:** `backend/agents/` is empty — `brain_agent.py` lives in `backend/agent/` instead.
 
 ---
 
@@ -102,33 +121,33 @@ result = response.choices[0].message.content
 ## BrainState — The Central Data Structure
 
 ```python
-from typing import TypedDict, Annotated
+from typing import TypedDict, Annotated, List, Dict, Any
 import operator
 
 class BrainState(TypedDict):
     company_id: str
-    source_files: list[dict]          # [{filename, content, sha256, type}]
-    
-    # Ingestion outputs (parallel, accumulated with operator.add)
-    normalized_events: Annotated[list[dict], operator.add]    # from Slack
-    structured_sops: Annotated[list[dict], operator.add]      # from Notion
-    resolved_cases: Annotated[list[dict], operator.add]       # from tickets
-    
-    # Extraction outputs (parallel, accumulated with operator.add)
-    raw_decisions: Annotated[list[dict], operator.add]
-    workflow_steps: Annotated[list[dict], operator.add]
-    exception_rules: Annotated[list[dict], operator.add]
-    contradictions: Annotated[list[dict], operator.add]
-    
-    # Compilation outputs (sequential)
-    draft_skills: list[dict]
-    skills_with_evidence: list[dict]
-    final_skills: list[dict]
-    
-    # Metadata
     job_id: str
+    source_files: Annotated[List[Dict[str, Any]], operator.add]
+
+    structured_sops: Annotated[List[Dict[str, Any]], operator.add]
+    normalized_events: Annotated[List[Dict[str, Any]], operator.add]
+    resolved_cases: Annotated[List[Dict[str, Any]], operator.add]
+
+    all_chunks: List[Dict[str, Any]]
+
+    raw_decisions: Annotated[List[Dict[str, Any]], operator.add]
+    workflow_steps: Annotated[List[Dict[str, Any]], operator.add]
+    exception_rules: Annotated[List[Dict[str, Any]], operator.add]
+    contradictions: Annotated[List[Dict[str, Any]], operator.add]
+
+    draft_skills: List[Dict[str, Any]]
+    skills_with_evidence: List[Dict[str, Any]]
+    final_skills: List[Dict[str, Any]]
+
+    skills_file: Dict[str, Any]
     brain_version: str
-    errors: Annotated[list[str], operator.add]
+    start_time: float
+    errors: Annotated[List[str], operator.add]
 ```
 
 **The `Annotated[list, operator.add]` pattern is critical.** It allows multiple parallel nodes to write to the same list field without overwriting each other. Do not change this.
@@ -195,41 +214,20 @@ USER = """Extract all {type} from this company data:
 
 ---
 
-## Skills File Schema (per skill)
+## Skills File Schema (per skill — pipeline output)
 
 ```python
 {
-    "id": "handle_refund_request",          # snake_case
-    "name": "Handle Refund Request",         # human readable
-    "domain": "support",                     # support|revenue|product_eng|customer_success|hr|finance_ops
-    "version": "1.0",
-    "confidence": 0.91,                      # 0.0 - 1.0
-    "stale": False,
-    "review_required": False,                # True if confidence < 0.6
-    "last_updated": "2026-05-04T09:30:00Z",
-    "trigger": {
-        "phrases": ["refund", "money back"],
-        "conditions": ["customer mentions payment dissatisfaction"]
-    },
-    "decision_logic": [
-        {
-            "condition": "plan == 'annual' AND days_since_purchase <= 14",
-            "action": "approve_full_refund",
-            "note": "No-questions policy within 14 days.",
-            "evidence_sources": [
-                {
-                    "source": "notion_refund_sop.md",
-                    "excerpt": "Annual plan customers within 14 days...",
-                    "confidence": 0.95
-                }
-            ]
-        }
+    "id": "handle_refund_request",        # snake_case
+    "category": "Customer Support",       # operational domain
+    "rule": "Approve full refund for annual plans within 14 days",  # actionable rule text
+    "rationale": "No-questions policy within 14 days for annual plans",
+    "evidence": [
+        "notion_refund_sop.md: Annual plan customers within 14 days..."
     ],
-    "forbidden_actions": [
-        "Never process refunds for lifetime deal accounts"
-    ],
-    "escalation_chain": ["support_agent", "support_lead", "account_manager", "founder"],
-    "sla": "respond_within_2h, resolve_within_24h"
+    "source_files": ["notion_refund_sop.md"],
+    "confidence": 0.85,                    # 0.0 - 1.0 (scored by score_confidence node)
+    "embedding_vector": [...]              # pre-computed for semantic matching
 }
 ```
 
@@ -238,11 +236,11 @@ USER = """Extract all {type} from this company data:
 ## Confidence Scoring Formula
 
 ```python
-def score_confidence(skill: dict, all_sources: list[dict]) -> float:
+def score_confidence(skill: dict, contradictions: list) -> float:
     base = 0.5
     
     # More sources = higher confidence
-    source_count = len(skill["decision_logic"][0].get("evidence_sources", []))
+    source_count = len(skill.get("evidence", []))
     if source_count >= 3:
         base += 0.25
     elif source_count == 2:
@@ -250,89 +248,64 @@ def score_confidence(skill: dict, all_sources: list[dict]) -> float:
     elif source_count == 1:
         base += 0.05
     
-    # Recent sources = higher confidence
-    # (check source file last_modified if available)
-    base += 0.15  # assume recent for v0
+    # Recency bonus (assume recent for v0)
+    base += 0.15
     
     # No contradictions for this skill = higher confidence
-    # (passed in from contradiction detector)
-    has_contradiction = False  # check contradictions list
+    skill_id = skill.get("id", "")
+    has_contradiction = any(
+        c.get("id", "").startswith(skill_id.split("_")[0])
+        or skill_id in str(c.get("domain", ""))
+        for c in contradictions
+    )
     if not has_contradiction:
         base += 0.10
     
-    return min(base, 1.0)
+    return round(min(base, 1.0), 2)
 ```
 
 ---
 
 ## Brain Agent Pattern
 
-```python
-from sentence_transformers import SentenceTransformer
-import numpy as np
+The brain agent at `backend/agent/brain_agent.py` uses:
+1. **Embedding similarity** — encodes the query with `all-MiniLM-L6-v2` and scores all skills via cosine similarity
+2. **Top-K retrieval** — fetches 5 best-matching skills
+3. **LLM reasoning** — injects retrieved skills into the prompt with the scenario and does arithmetic threshold analysis
+4. **JSON parsing** — extracts the response with a fallback for malformed JSON
 
-# Load once at startup
-embedder = SentenceTransformer('all-MiniLM-L6-v2')
-
-# Pre-compute skill embeddings (call after compile)
-skill_embeddings = {}  # {skill_id: np.array}
-
-def compute_skill_embeddings(skills: list[dict]):
-    global skill_embeddings
-    for skill in skills:
-        text = f"{skill['name']} {' '.join(skill['trigger']['phrases'])}"
-        skill_embeddings[skill['id']] = embedder.encode(text)
-
-def match_skill(query: str) -> tuple[str, float]:
-    query_emb = embedder.encode(query)
-    scores = {}
-    for skill_id, emb in skill_embeddings.items():
-        score = float(np.dot(query_emb, emb) / 
-                     (np.linalg.norm(query_emb) * np.linalg.norm(emb)))
-        scores[skill_id] = score
-    best_id = max(scores, key=scores.get)
-    return best_id, scores[best_id]
-
-def skill_to_markdown(skill: dict) -> str:
-    """Convert skill JSON to markdown for prompt injection."""
-    lines = [f"## {skill['name']}", ""]
-    for logic in skill['decision_logic']:
-        lines.append(f"- IF {logic['condition']}: {logic['action']}")
-        if logic.get('note'):
-            lines.append(f"  Note: {logic['note']}")
-    lines.append("")
-    lines.append("FORBIDDEN: " + "; ".join(skill['forbidden_actions']))
-    lines.append("ESCALATE: " + " → ".join(skill['escalation_chain']))
-    return "\n".join(lines)
-```
+Key behavior:
+- Uses **pre-computed embeddings** (stored in DB by write_brain node) or computes on-the-fly
+- The LLM prompt has explicit step-by-step threshold comparison logic
+- Gibberish rejection: low embedding similarity → low confidence → meaningful fallback
+- A/B comparison: `with_brain=True/False` to compare against a generic baseline
 
 ---
 
-## FastAPI SSE Pattern
+## SSE Event Bus Pattern
+
+`backend/sse.py` uses an `asyncio.Queue` per job_id with a `CompilationEventBus` singleton. Events are unnamed (no `event:` field) — the frontend uses `EventSource.onmessage` which fires on unnamed events. Payload is wrapped: `data: {"event": "<type>", "data": {<payload>}}\n\n`.
 
 ```python
-from fastapi import FastAPI
-from fastapi.responses import StreamingResponse
-import asyncio
-import json
+class CompilationEventBus:
+    def __init__(self):
+        self.queues: Dict[str, asyncio.Queue] = {}
 
-async def event_generator(job_id: str):
-    """Yields SSE events during compilation."""
-    async for event in compilation_events[job_id]:
-        yield f"event: {event['type']}\ndata: {json.dumps(event['data'])}\n\n"
+    async def emit_event(self, job_id: str, event_type: str, data: dict):
+        queue = self.get_queue(job_id)
+        await queue.put({"type": event_type, "data": data})
 
-@app.get("/compile/stream")
-async def stream_compile(job_id: str):
-    return StreamingResponse(
-        event_generator(job_id),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "Access-Control-Allow-Origin": "*"  # CORS for frontend
-        }
-    )
+    async def event_generator(self, job_id: str) -> AsyncGenerator[str, None]:
+        queue = self.get_queue(job_id)
+        while True:
+            event = await asyncio.wait_for(queue.get(), timeout=300)
+            payload = json.dumps({"event": event["type"], "data": event["data"]})
+            yield f"data: {payload}\n\n"
+            if event["type"] in ["pipeline_complete", "pipeline_error"]:
+                break
 ```
+
+Queue auto-cleaned in `finally` block after completion or error.
 
 ---
 
@@ -359,18 +332,20 @@ CREATE TABLE skills_files (
   is_current BOOLEAN DEFAULT false
 );
 
-CREATE UNIQUE INDEX idx_one_current_per_company 
-  ON skills_files(company_id) WHERE is_current = true;
+CREATE UNIQUE INDEX idx_skills_files_current ON skills_files(company_id) WHERE is_current = true;
 
-CREATE TABLE compile_runs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+CREATE TABLE skills (
+  id TEXT NOT NULL,
   company_id TEXT REFERENCES companies(id),
-  status TEXT CHECK (status IN ('started','running','complete','error')),
-  started_at TIMESTAMPTZ DEFAULT now(),
-  completed_at TIMESTAMPTZ,
-  duration_ms INTEGER,
-  result_version TEXT,
-  error_detail TEXT
+  skills_file_id UUID REFERENCES skills_files(id),
+  name TEXT NOT NULL,
+  domain TEXT NOT NULL,
+  version TEXT NOT NULL,
+  confidence FLOAT NOT NULL,
+  stale BOOLEAN DEFAULT false,
+  review_required BOOLEAN DEFAULT false,
+  skill_json JSONB NOT NULL,
+  PRIMARY KEY (id, company_id, skills_file_id)
 );
 
 CREATE TABLE source_files (
@@ -378,10 +353,23 @@ CREATE TABLE source_files (
   company_id TEXT REFERENCES companies(id),
   filename TEXT NOT NULL,
   sha256 TEXT NOT NULL,
-  content TEXT NOT NULL,
-  source_type TEXT CHECK (source_type IN ('slack_json','notion_md','tickets_json')),
+  storage_path TEXT NOT NULL,
   uploaded_at TIMESTAMPTZ DEFAULT now()
 );
+
+CREATE TABLE compile_runs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id TEXT REFERENCES companies(id),
+  status TEXT NOT NULL CHECK (status IN ('started','running','complete','error')),
+  started_at TIMESTAMPTZ DEFAULT now(),
+  completed_at TIMESTAMPTZ,
+  duration_ms INTEGER,
+  result_version TEXT,
+  error_detail TEXT
+);
+
+CREATE INDEX idx_skills_files_company ON skills_files(company_id, compiled_at DESC);
+CREATE INDEX idx_skills_company ON skills(company_id);
 ```
 
 ---
@@ -401,14 +389,20 @@ COMPANY_ID=rivanly-inc
 ## API Endpoints — Full List
 
 ```
-POST /compile              → trigger pipeline, returns {job_id, stream_url}
-GET  /compile/stream       → SSE stream for job_id
-GET  /brain/status         → current brain version + stats
-GET  /skills               → all skills (lightweight)
-GET  /skills/{id}          → full skill detail
-POST /agent/handle         → brain agent query
-GET  /diff/{v1}/{v2}       → version diff
-POST /sources/upload       → upload source files
+POST   /compile                    → trigger pipeline, returns {job_id, status}
+POST   /compile/run                → alias for /compile
+GET    /compile/{job_id}/stream    → SSE stream for live compilation progress
+GET    /compile/{job_id}/status    → poll job status (started/running/complete/error)
+GET    /health                     → API health + vLLM + DB status
+POST   /sources/upload             → upload a source file
+GET    /sources/{company_id}       → list all source files
+DELETE /sources/{company_id}/{filename} → delete a source file
+POST   /agent/handle               → brain agent query (legacy schema)
+POST   /agent/query                → brain agent query (canonical schema)
+GET    /skills                     → get current brain JSON (legacy)
+GET    /skills/{company_id}        → get current brain with version + metadata
+GET    /brain/versions/{company_id}→ list all compiled versions
+GET    /diff/{v1}/{v2}             → semantic diff between two brain versions
 ```
 
 ---
@@ -420,7 +414,7 @@ POST /sources/upload       → upload source files
 3. **Never read raw source files at query time** — brain agent reads skills file only
 4. **All LLM calls wrapped in try/except** — retry once on JSON parse failure, return `[]` if still failing
 5. **`skills_files.is_current` enforced by partial unique index** — only one current per company
-6. **`compile_runs` table is append-only** — never update rows, only insert
+6. **`compile_runs` table is append-only** — never update rows, only insert status
 7. **CORS headers on all endpoints** — frontend is on different domain
 8. **Temperature 0.1 on all extraction calls** — deterministic is better than creative here
 
