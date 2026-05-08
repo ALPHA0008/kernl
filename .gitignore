@@ -40,3 +40,8 @@ htmlcov/
 # For the hackathon, we keep the static demo rivanly-inc files, but ignore other companies if uploaded
 data/sources/*/
 !data/sources/rivanly-inc/
+
+# Local documents & drafts (untracked on GitHub)
+brand_alchemy_company_brain.html
+company_brain_PRD_v4.md
+
