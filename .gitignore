@@ -1,0 +1,42 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environments & Secret credentials
+.env
+.env.local
+.env*.local
+backend/.env
+frontend/.env
+
+# Local database files
+*.db
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+backend/db/local_brain.db
+
+# Node dependencies & Next.js cache
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Unit test & Coverage reports
+.pytest_cache/
+.coverage
+htmlcov/
+.cache/
+
+# User data sources (ignore uploaded dynamic sources, keep demo ones if needed)
+# For the hackathon, we keep the static demo rivanly-inc files, but ignore other companies if uploaded
+data/sources/*/
+!data/sources/rivanly-inc/

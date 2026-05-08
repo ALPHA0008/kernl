@@ -1,0 +1,254 @@
+
+<style>
+  .ba-root { font-family: var(--font-sans); padding: 1.5rem 0; }
+  .section-label { font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-tertiary); margin-bottom: 0.75rem; }
+  .pov-block { border-left: 2px solid var(--color-border-secondary); padding: 0.75rem 1rem; margin-bottom: 1.5rem; }
+  .pov-block p { margin: 0; font-size: 15px; color: var(--color-text-primary); line-height: 1.6; }
+  .pov-block .pov-sub { font-size: 13px; color: var(--color-text-secondary); margin-top: 0.4rem; }
+  .meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 2rem; }
+  .meta-card { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 0.75rem 1rem; }
+  .meta-card .mk { font-size: 11px; color: var(--color-text-tertiary); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .meta-card .mv { font-size: 13px; font-weight: 500; color: var(--color-text-primary); }
+  .name-card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1.25rem; margin-bottom: 0.75rem; }
+  .name-card.winner { border: 1.5px solid #1D9E75; }
+  .name-header { display: flex; align-items: center; gap: 12px; margin-bottom: 0.75rem; }
+  .name-title { font-size: 22px; font-weight: 500; color: var(--color-text-primary); letter-spacing: -0.02em; }
+  .name-score { display: flex; gap: 6px; margin-left: auto; align-items: center; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-border-tertiary); }
+  .dot.filled { background: #1D9E75; }
+  .winner-badge { font-size: 11px; font-weight: 500; background: #E1F5EE; color: #0F6E56; padding: 3px 10px; border-radius: 20px; }
+  .name-tagline { font-size: 14px; color: var(--color-text-secondary); margin-bottom: 0.75rem; font-style: italic; }
+  .phono-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 0.75rem; }
+  .phono-pill { font-size: 11px; background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); color: var(--color-text-secondary); padding: 3px 10px; border-radius: 20px; }
+  .phono-pill.p { background: #EEEDFE; color: #3C3489; border-color: #AFA9EC; }
+  .phono-pill.l { background: #E1F5EE; color: #0F6E56; border-color: #5DCAA5; }
+  .phono-pill.f { background: #FAEEDA; color: #633806; border-color: #EF9F27; }
+  .name-reasoning { font-size: 13px; color: var(--color-text-secondary); line-height: 1.6; margin-bottom: 0.75rem; }
+  .domain-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .domain-tag { font-size: 12px; font-weight: 500; padding: 3px 10px; border-radius: 20px; display: flex; align-items: center; gap: 5px; }
+  .domain-tag.available { background: #E1F5EE; color: #085041; }
+  .domain-tag.taken { background: #FCEBEB; color: #791F1F; }
+  .diamond-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 2rem; }
+  .diamond-item { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 0.6rem; text-align: center; }
+  .diamond-label { font-size: 11px; color: var(--color-text-tertiary); margin-bottom: 4px; }
+  .diamond-bar-bg { height: 4px; background: var(--color-border-tertiary); border-radius: 2px; overflow: hidden; }
+  .diamond-bar-fill { height: 4px; border-radius: 2px; background: #1D9E75; }
+  .diamond-score { font-size: 12px; font-weight: 500; color: var(--color-text-primary); margin-top: 4px; }
+  .divider { border: none; border-top: 0.5px solid var(--color-border-tertiary); margin: 1.5rem 0; }
+  .rec-block { background: #E1F5EE; border-radius: var(--border-radius-lg); padding: 1.25rem; margin-top: 1rem; }
+  .rec-title { font-size: 14px; font-weight: 500; color: #085041; margin-bottom: 0.5rem; }
+  .rec-text { font-size: 13px; color: #0F6E56; line-height: 1.6; }
+  .positioning-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 1.5rem; }
+  .positioning-table td { padding: 8px 12px; border-bottom: 0.5px solid var(--color-border-tertiary); color: var(--color-text-secondary); vertical-align: top; }
+  .positioning-table td:first-child { font-weight: 500; color: var(--color-text-primary); width: 40%; }
+</style>
+
+<div class="ba-root">
+  <h2 style="sr-only">Brand Alchemy Report — Company Brain</h2>
+
+  <div class="section-label">Product DNA — what was learned</div>
+  <div class="pov-block">
+    <p>A compiler layer that extracts the operational judgment scattered across Slack, SOPs, tickets and people's heads — and produces a versioned, evidence-linked, executable skills file any AI agent can consume.</p>
+    <p class="pov-sub">Not RAG. Not a chatbot. Not search. A compiler of how a company actually decides things — living, stale-aware, and infrastructure-grade.</p>
+  </div>
+
+  <div class="meta-grid">
+    <div class="meta-card">
+      <div class="mk">Category</div>
+      <div class="mv">AI Infrastructure</div>
+    </div>
+    <div class="meta-card">
+      <div class="mk">Audience</div>
+      <div class="mv">B2B SaaS Ops + AI Builders</div>
+    </div>
+    <div class="meta-card">
+      <div class="mk">Brand vibe</div>
+      <div class="mv">Authoritative + Precise</div>
+    </div>
+    <div class="meta-card">
+      <div class="mk">Core metaphor</div>
+      <div class="mv">Compiler, not assistant</div>
+    </div>
+    <div class="meta-card">
+      <div class="mk">Alternative today</div>
+      <div class="mv">Long system prompts, Notion docs</div>
+    </div>
+    <div class="meta-card">
+      <div class="mk">The moat</div>
+      <div class="mv">Stale detection + evidence trail</div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <div class="section-label">Category point of view (POV)</div>
+  <div class="pov-block" style="margin-bottom: 2rem;">
+    <p>The old category — "knowledge management" — is about humans finding information. The new category is <strong style="color:var(--color-text-primary)">operational memory infrastructure</strong>: the persistent, executable layer that lets AI agents inherit a company's judgment. The race isn't between AI models. It's between companies that give their agents operational memory and those that don't.</p>
+  </div>
+
+  <hr class="divider">
+
+  <div class="section-label">Phonosemantics key — sound symbolism used</div>
+  <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom: 1.5rem;">
+    <span class="phono-pill p">P — plosive → authority, precision</span>
+    <span class="phono-pill l">L — liquid → intelligence, flow</span>
+    <span class="phono-pill f">F — fricative → speed, edge</span>
+    <span class="phono-pill" style="background:#FAECE7;color:#712B13;border-color:#F0997B;">N — nasal → warmth, connection</span>
+    <span class="phono-pill" style="background:#E6F1FB;color:#0C447C;border-color:#85B7EB;">K — hard plosive → technical force</span>
+  </div>
+
+  <div class="section-label">5 name candidates — linguistic breakdown + domain verification</div>
+
+  <!-- KERNL -->
+  <div class="name-card winner">
+    <div class="name-header">
+      <div class="name-title">Kernl</div>
+      <span class="winner-badge">★ top pick</span>
+      <div class="name-score">
+        <div class="dot filled"></div><div class="dot filled"></div><div class="dot filled"></div><div class="dot filled"></div><div class="dot filled"></div>
+      </div>
+    </div>
+    <div class="name-tagline">"The operational kernel your AI agents run on."</div>
+    <div class="phono-row">
+      <span class="phono-pill p">K plosive — technical force</span>
+      <span class="phono-pill l">R liquid — intelligence</span>
+      <span class="phono-pill" style="background:#FAECE7;color:#712B13;border-color:#F0997B;">N nasal — familiar</span>
+      <span class="phono-pill" style="background:#E6F1FB;color:#0C447C;border-color:#85B7EB;">dropped 'e' — modern tech register</span>
+    </div>
+    <div class="name-reasoning">A kernel is the essential core of an operating system — the layer that mediates between hardware and everything above it. Kernl <em>is</em> that layer for AI agents: between raw company data and reliable automation. The dropped final 'e' (à la Tumblr, Flickr) signals a distinctly technical register. Infrastructure-grade naming — belongs alongside Redis, Kafka, Postgres.</div>
+    <div class="domain-row">
+      <span class="domain-tag available"><i class="ti ti-check" aria-hidden="true"></i> kernl.com</span>
+      <span class="domain-tag taken"><i class="ti ti-x" aria-hidden="true"></i> kernl.ai</span>
+      <span class="domain-tag taken"><i class="ti ti-x" aria-hidden="true"></i> kernl.io</span>
+    </div>
+  </div>
+
+  <!-- MELD -->
+  <div class="name-card">
+    <div class="name-header">
+      <div class="name-title">Meld</div>
+      <div class="name-score">
+        <div class="dot filled"></div><div class="dot filled"></div><div class="dot filled"></div><div class="dot filled"></div><div class="dot"></div>
+      </div>
+    </div>
+    <div class="name-tagline">"Melds scattered knowledge into a single executable mind."</div>
+    <div class="phono-row">
+      <span class="phono-pill" style="background:#FAECE7;color:#712B13;border-color:#F0997B;">M nasal — warmth, familiarity</span>
+      <span class="phono-pill l">L liquid — intelligence</span>
+      <span class="phono-pill p">D plosive — decisive, final</span>
+      <span class="phono-pill" style="background:#E6F1FB;color:#0C447C;border-color:#85B7EB;">1 syllable — maximum compression</span>
+    </div>
+    <div class="name-reasoning">To meld is to blend disparate elements into a unified whole. In card games, it means to lay down your hidden hand — revealing what was implicit. Both meanings map perfectly: Meld takes scattered, implicit operational knowledge and merges it into explicit, executable form. One syllable, pure infrastructure energy, zero ambiguity.</div>
+    <div class="domain-row">
+      <span class="domain-tag available"><i class="ti ti-check" aria-hidden="true"></i> meld.com</span>
+      <span class="domain-tag taken"><i class="ti ti-x" aria-hidden="true"></i> meld.ai</span>
+      <span class="domain-tag taken"><i class="ti ti-x" aria-hidden="true"></i> meld.io</span>
+    </div>
+  </div>
+
+  <!-- OPSLORE -->
+  <div class="name-card">
+    <div class="name-header">
+      <div class="name-title">Opslore</div>
+      <div class="name-score">
+        <div class="dot filled"></div><div class="dot filled"></div><div class="dot filled"></div><div class="dot filled"></div><div class="dot"></div>
+      </div>
+    </div>
+    <div class="name-tagline">"The living operational lore of your company, made executable."</div>
+    <div class="phono-row">
+      <span class="phono-pill p">P plosive — operational precision</span>
+      <span class="phono-pill f">S fricative — speed</span>
+      <span class="phono-pill l">L+R liquids — intelligence, depth</span>
+    </div>
+    <div class="name-reasoning">Lore is the body of accumulated, traditional knowledge belonging to a group — the unwritten rules, the cultural wisdom. "Opslore" is the operational lore of a company: how refunds get handled, why escalation chains exist, what the pricing exception rule actually is. The word has warmth and depth while remaining precise. Best domain position of any candidate — .com, .ai, and .io all clear.</div>
+    <div class="domain-row">
+      <span class="domain-tag available"><i class="ti ti-check" aria-hidden="true"></i> opslore.com</span>
+      <span class="domain-tag available"><i class="ti ti-check" aria-hidden="true"></i> opslore.ai</span>
+      <span class="domain-tag available"><i class="ti ti-check" aria-hidden="true"></i> opslore.io</span>
+    </div>
+  </div>
+
+  <!-- OPSCODEX -->
+  <div class="name-card">
+    <div class="name-header">
+      <div class="name-title">Opscodex</div>
+      <div class="name-score">
+        <div class="dot filled"></div><div class="dot filled"></div><div class="dot filled"></div><div class="dot filled"></div><div class="dot"></div>
+      </div>
+    </div>
+    <div class="name-tagline">"The compiled operational codex your agents execute from."</div>
+    <div class="phono-row">
+      <span class="phono-pill p">K+P plosives — double authority</span>
+      <span class="phono-pill" style="background:#EEEDFE;color:#3C3489;border-color:#AFA9EC;">X terminal — distinct, rare</span>
+      <span class="phono-pill" style="background:#E6F1FB;color:#0C447C;border-color:#85B7EB;">Codex etymology — compiled law</span>
+    </div>
+    <div class="name-reasoning">A codex was the ancient form of the book — sheets compiled and bound, replacing scrolls. Historically, codices preserved legal codes, canonical texts, laws. Opscodex is the compiled operational code of a company: the canonical, authoritative record of how things are decided. The terminal X adds sonic distinctiveness and technical sharpness. Carries scholarly gravitas — infrastructure, not a feature.</div>
+    <div class="domain-row">
+      <span class="domain-tag available"><i class="ti ti-check" aria-hidden="true"></i> opscodex.com</span>
+      <span class="domain-tag available"><i class="ti ti-check" aria-hidden="true"></i> opscodex.ai</span>
+    </div>
+  </div>
+
+  <!-- LOREKERN -->
+  <div class="name-card">
+    <div class="name-header">
+      <div class="name-title">Lorekern</div>
+      <div class="name-score">
+        <div class="dot filled"></div><div class="dot filled"></div><div class="dot filled"></div><div class="dot"></div><div class="dot"></div>
+      </div>
+    </div>
+    <div class="name-tagline">"The kernel of operational lore, distilled and executable."</div>
+    <div class="phono-row">
+      <span class="phono-pill l">L+R liquids — intelligence, flow</span>
+      <span class="phono-pill p">K plosive — technical core</span>
+      <span class="phono-pill" style="background:#FAECE7;color:#712B13;border-color:#F0997B;">N nasal — grounding</span>
+    </div>
+    <div class="name-reasoning">Morpheme blend of Lore (accumulated operational wisdom) and Kern (kernel/core). Reads as two concepts merged — like the product itself: taking the living lore of an organization and distilling it into an executable core. More descriptive and compound than the other candidates; works well if a human-warmth brand angle is preferred over pure infrastructure framing.</div>
+    <div class="domain-row">
+      <span class="domain-tag available"><i class="ti ti-check" aria-hidden="true"></i> lorekern.com</span>
+      <span class="domain-tag available"><i class="ti ti-check" aria-hidden="true"></i> lorekern.ai</span>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <div class="section-label">Diamond test — top pick: Kernl</div>
+  <div class="diamond-grid">
+    <div class="diamond-item">
+      <div class="diamond-label">Distinctiveness</div>
+      <div class="diamond-bar-bg"><div class="diamond-bar-fill" style="width:96%"></div></div>
+      <div class="diamond-score">96</div>
+    </div>
+    <div class="diamond-item">
+      <div class="diamond-label">Processing fluency</div>
+      <div class="diamond-bar-bg"><div class="diamond-bar-fill" style="width:95%"></div></div>
+      <div class="diamond-score">95</div>
+    </div>
+    <div class="diamond-item">
+      <div class="diamond-label">Relevance</div>
+      <div class="diamond-bar-bg"><div class="diamond-bar-fill" style="width:97%"></div></div>
+      <div class="diamond-score">97</div>
+    </div>
+    <div class="diamond-item">
+      <div class="diamond-label">Energy</div>
+      <div class="diamond-bar-bg"><div class="diamond-bar-fill" style="width:88%"></div></div>
+      <div class="diamond-score">88</div>
+    </div>
+  </div>
+
+  <div class="rec-block">
+    <div class="rec-title">Final recommendation: Kernl</div>
+    <div class="rec-text">Register <strong>kernl.com</strong> immediately. The kernel metaphor is structurally perfect — it is the deepest, most precise analogy in the OS/infra vocabulary for what this product does. The hard K plosive delivers maximum technical authority. The dropped 'e' places it firmly in infrastructure naming tradition. It scales: "your company's Kernl", "deploy Kernl", "the Kernl API". It competes with Redis and Kafka on naming gravity, which is exactly the positioning the PRD demands.</div>
+  </div>
+
+  <hr class="divider">
+
+  <div class="section-label">Visual system direction</div>
+  <table class="positioning-table">
+    <tr><td>Mark style</td><td>Wordmark only. No icon. Infrastructure products don't need icons — they are the icon. Monospace or geometric sans. Think Stripe, Linear, Vercel.</td></tr>
+    <tr><td>Color</td><td>Single accent on near-black ground. Deep teal (#0F6E56) or electric indigo — evokes precision and living systems without the generic "AI blue" trap.</td></tr>
+    <tr><td>Voice</td><td>Declarative. Short sentences. Never explain — demonstrate. "12 skills. 58 seconds. Evidence-linked." — not "our platform leverages AI to..."</td></tr>
+    <tr><td>Tagline direction</td><td>"Operational memory for AI agents." — or — "Your AI knows how your company works."</td></tr>
+    <tr><td>Pitch one-liner</td><td>"Kernl compiles how your company decides into an executable skills file. Any agent. Any task. Correct every time."</td></tr>
+  </table>
+</div>

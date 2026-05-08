@@ -1,0 +1,26 @@
+[
+  {
+    "channel": "support-triage",
+    "user": "sarah_am",
+    "text": "Hey team, Acme Corp (been with us 4 years) is asking for a refund for last month's invoice due to the billing mixup. It's been 45 days since that charge, I know SOP says 30 days max.",
+    "timestamp": "2026-03-12T10:00:00Z"
+  },
+  {
+    "channel": "support-triage",
+    "user": "mike_lead",
+    "text": "For loyal customers over 2 years tenure, we can bypass the 30-day rule. Go ahead and approve the refund for Acme Corp.",
+    "timestamp": "2026-03-12T10:05:00Z"
+  },
+  {
+    "channel": "support-triage",
+    "user": "alex_support",
+    "text": "We have an active platform outage affecting all EU servers. Customers are opening tickets left and right.",
+    "timestamp": "2026-04-01T14:20:00Z"
+  },
+  {
+    "channel": "support-triage",
+    "user": "mike_lead",
+    "text": "Do not try to troubleshoot individual EU tickets right now. Just send the incident response template and close the tickets.",
+    "timestamp": "2026-04-01T14:22:00Z"
+  }
+]

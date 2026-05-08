@@ -1,0 +1,20 @@
+[
+  {
+    "channel": "finance-ops",
+    "user": "jessica_fin",
+    "text": "I have an incoming vendor invoice for $3,500 from Datadog (software vendor). Who needs to approve this?",
+    "timestamp": "2026-02-15T09:30:00Z"
+  },
+  {
+    "channel": "finance-ops",
+    "user": "david_ops_lead",
+    "text": "Any software vendor invoice of $3,500 or more needs to be routed to the ops lead for approval before finance pays it. Send it my way.",
+    "timestamp": "2026-02-15T09:45:00Z"
+  },
+  {
+    "channel": "finance-ops",
+    "user": "jessica_fin",
+    "text": "Got it, routing it to you.",
+    "timestamp": "2026-02-15T09:46:00Z"
+  }
+]

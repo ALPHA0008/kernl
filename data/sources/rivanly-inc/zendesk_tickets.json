@@ -1,0 +1,23 @@
+[
+  {
+    "id": "TICKET-1042",
+    "subject": "Dashboard not loading",
+    "description": "I cannot access the main dashboard. It just spins forever.",
+    "resolution": "P0 bug confirmed. Paged on-call engineer immediately as this is an Enterprise customer.",
+    "tags": ["bug", "P0", "enterprise"]
+  },
+  {
+    "id": "TICKET-1045",
+    "subject": "Export feature failing",
+    "description": "When I try to export reports to CSV, it fails.",
+    "resolution": "Confirmed P1 bug for Enterprise customer GlobalCorp. Escalated to Eng and resolved same-day (within 12 hours), outside the normal 4-hour SLA but acceptable for this specific complex issue for Enterprise.",
+    "tags": ["bug", "P1", "enterprise"]
+  },
+  {
+    "id": "TICKET-1088",
+    "subject": "SLA breached on ticket 1087",
+    "description": "We have been waiting 6 hours for a response.",
+    "resolution": "SLA breached by 2 hours for Enterprise customer. Notified AM and Eng Lead immediately.",
+    "tags": ["sla_breach", "enterprise"]
+  }
+]
