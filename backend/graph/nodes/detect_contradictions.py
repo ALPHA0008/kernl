@@ -2,6 +2,20 @@ from backend.graph.state import BrainState
 from backend.llm import safe_llm_json_call
 from backend.sse import emit
 
+MAX_CHUNK_CHARS = 12000
+
+
+def _cap_chunks(chunks: list[dict]) -> str:
+    parts = []
+    chars = 0
+    for c in chunks:
+        text = c.get("text", "")
+        if chars + len(text) > MAX_CHUNK_CHARS:
+            break
+        parts.append(text)
+        chars += len(text)
+    return "\n\n---\n\n".join(parts)
+
 
 SYSTEM = """You are a contradiction detection specialist. Your ONLY job is to find CONTRADICTIONS, CONFLICTS, and INCONSISTENCIES across company communications.
 
@@ -34,7 +48,7 @@ async def detect_contradictions(state: BrainState) -> dict:
         },
     )
 
-    chunk_text = "\n\n---\n\n".join([c.get("text", "") for c in chunks])
+    chunk_text = _cap_chunks(chunks)
     user = f"Detect contradictions and conflicting instructions across this company data:\n\n{chunk_text}"
 
     results = await safe_llm_json_call(SYSTEM, user, max_tokens=2048)

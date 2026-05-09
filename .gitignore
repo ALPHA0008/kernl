@@ -56,3 +56,5 @@ backend/nul
 backend_log.txt
 *.log
 
+
+backend.env

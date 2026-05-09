@@ -7,10 +7,6 @@ class BrainState(TypedDict):
     job_id: str
     source_files: Annotated[List[Dict[str, Any]], operator.add]
 
-    structured_sops: Annotated[List[Dict[str, Any]], operator.add]
-    normalized_events: Annotated[List[Dict[str, Any]], operator.add]
-    resolved_cases: Annotated[List[Dict[str, Any]], operator.add]
-
     all_chunks: List[Dict[str, Any]]
 
     raw_decisions: Annotated[List[Dict[str, Any]], operator.add]

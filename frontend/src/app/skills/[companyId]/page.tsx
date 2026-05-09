@@ -2,6 +2,10 @@
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
+import { API_BASE } from "@/lib/api";
+import DashboardLayout from "@/components/DashboardLayout";
+import GlassCard from "@/components/ui/GlassCard";
+import ConfidenceBadge from "@/components/ui/ConfidenceBadge";
 
 type Skill = {
   id?: string;
@@ -10,6 +14,8 @@ type Skill = {
   rationale?: string;
   evidence?: string[];
   confidence?: number;
+  source_files?: string[];
+  embedding_vector?: number[];
 };
 
 type SkillsData = {
@@ -26,19 +32,17 @@ export default function SkillsViewer({ params }: { params: Promise<{ companyId: 
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("");
   const [sortBy, setSortBy] = useState<"category" | "confidence">("category");
+  const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
   const router = useRouter();
 
   useEffect(() => {
-    fetch(`http://localhost:8080/skills/${companyId}`)
+    fetch(`${API_BASE}/skills/${companyId}`)
       .then((res) => res.json())
       .then((d) => {
         setData(d);
         setLoading(false);
       })
-      .catch((err) => {
-        console.error(err);
-        setLoading(false);
-      });
+      .catch(() => setLoading(false));
   }, [companyId]);
 
   const skills = data?.skills || [];
@@ -47,116 +51,279 @@ export default function SkillsViewer({ params }: { params: Promise<{ companyId: 
   const filtered = skills
     .filter((s) => {
       if (!filter) return true;
-      return (s.category || "").toLowerCase().includes(filter.toLowerCase());
+      return (s.category || "") === filter;
     })
     .sort((a, b) => {
       if (sortBy === "confidence") return (b.confidence || 0) - (a.confidence || 0);
       return (a.category || "").localeCompare(b.category || "");
     });
 
-  const confidenceColor = (c: number) => {
-    if (c >= 0.8) return "text-green-400 border-green-400/30";
-    if (c >= 0.6) return "text-yellow-400 border-yellow-400/30";
-    if (c >= 0.4) return "text-orange-400 border-orange-400/30";
-    return "text-red-400 border-red-400/30";
-  };
-
   return (
-    <div className="min-h-screen p-8 flex flex-col">
-      <div className="flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-primary">Skills File Viewer</h1>
-          {data?.version && (
-            <p className="text-text-secondary text-sm mt-1">
-              Version: <span className="font-mono text-primary">{data.version}</span>
-              {data.compiled_at && (
-                <> · Compiled: {new Date(data.compiled_at).toLocaleString()}</>
-              )}
-              {" · "}{skills.length} skills
-            </p>
-          )}
+    <DashboardLayout>
+      <div className="p-6 lg:p-8 max-w-7xl mx-auto animate-fade-in">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
+              Skills Explorer
+            </h1>
+            {data?.version && (
+              <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
+                <span className="font-mono" style={{ color: "var(--primary)" }}>
+                  {data.version}
+                </span>
+                {data.compiled_at && (
+                  <> · {new Date(data.compiled_at).toLocaleDateString()}</>
+                )}
+                {" · "}
+                <span style={{ color: "var(--text-secondary)" }}>{skills.length} skills</span>
+              </p>
+            )}
+          </div>
+          <button
+            onClick={() => router.push(`/demo/${companyId}`)}
+            className="btn-primary"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <circle cx="7" cy="7" r="5.5" />
+              <path d="M7 4v3l2 1.5" strokeLinecap="round" />
+            </svg>
+            Query Agent
+          </button>
         </div>
-        <button onClick={() => router.push("/")} className="text-text-secondary hover:text-foreground">
-          Back
-        </button>
-      </div>
 
-      {/* Filter + Sort Controls */}
-      <div className="flex gap-4 mb-4">
-        <select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="bg-surface border border-gray-700 text-foreground px-3 py-2 text-sm"
-        >
-          <option value="">All Categories</option>
-          {categories.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as "category" | "confidence")}
-          className="bg-surface border border-gray-700 text-foreground px-3 py-2 text-sm"
-        >
-          <option value="category">Sort by Category</option>
-          <option value="confidence">Sort by Confidence</option>
-        </select>
-      </div>
+        {/* Filter Chips */}
+        <div className="flex gap-2 flex-wrap mb-6">
+          <button
+            onClick={() => setFilter("")}
+            className="badge transition-all"
+            style={{
+              background: !filter ? "var(--primary-ghost)" : "transparent",
+              color: !filter ? "var(--primary)" : "var(--text-muted)",
+              border: `1px solid ${!filter ? "rgba(0,210,180,0.2)" : "var(--border)"}`,
+              cursor: "pointer",
+            }}
+          >
+            All ({skills.length})
+          </button>
+          {categories.map((cat) => {
+            const count = skills.filter((s) => (s.category || "Unknown") === cat).length;
+            const active = filter === cat;
+            return (
+              <button
+                key={cat}
+                onClick={() => setFilter(active ? "" : cat)}
+                className="badge transition-all"
+                style={{
+                  background: active ? "var(--primary-ghost)" : "transparent",
+                  color: active ? "var(--primary)" : "var(--text-muted)",
+                  border: `1px solid ${active ? "rgba(0,210,180,0.2)" : "var(--border)"}`,
+                  cursor: "pointer",
+                }}
+              >
+                {cat} ({count})
+              </button>
+            );
+          })}
 
-      {/* Skills Grid */}
-      <div className="flex-1 overflow-y-auto">
+          {/* Sort toggle */}
+          <div className="ml-auto">
+            <button
+              onClick={() => setSortBy(sortBy === "category" ? "confidence" : "category")}
+              className="badge transition-all"
+              style={{
+                background: "transparent",
+                color: "var(--text-secondary)",
+                border: "1px solid var(--border)",
+                cursor: "pointer",
+              }}
+            >
+              Sort: {sortBy === "category" ? "Category" : "Confidence"}
+            </button>
+          </div>
+        </div>
+
+        {/* Skills Grid */}
         {loading ? (
-          <div className="text-text-secondary">Loading skills...</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="glass-card p-5 animate-shimmer" style={{ height: "180px" }} />
+            ))}
+          </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-text-secondary text-lg">No skills compiled yet.</p>
-            <p className="text-text-secondary text-sm mt-2">
-              Go to Dashboard → Compile Brain to generate skills from your source documents.
+          <div className="empty-state animate-fade-up">
+            <div className="empty-state__icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <rect x="4" y="4" width="16" height="16" rx="2" />
+                <path d="M9 9h6M9 12h4" strokeLinecap="round" />
+              </svg>
+            </div>
+            <h2 className="text-lg font-bold mb-2" style={{ color: "var(--text-primary)" }}>
+              No skills compiled yet
+            </h2>
+            <p className="text-sm mb-6" style={{ color: "var(--text-secondary)" }}>
+              Compile your company brain to generate skills from source documents.
             </p>
+            <button onClick={() => router.push("/onboarding")} className="btn-primary">
+              Start Onboarding
+            </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 stagger-children">
             {filtered.map((skill, i) => (
-              <div
+              <GlassCard
                 key={skill.id || i}
-                className="bg-surface border border-gray-800 p-5 hover:border-primary/30 transition-colors"
+                interactive
+                onClick={() => setSelectedSkill(skill)}
               >
                 <div className="flex justify-between items-start mb-3">
-                  <span className="text-xs font-mono bg-primary/10 text-primary px-2 py-1 rounded">
-                    {skill.category || "Unknown"}
-                  </span>
-                  <span
-                    className={`text-xs font-mono px-2 py-1 border rounded ${confidenceColor(
-                      skill.confidence || 0
-                    )}`}
-                  >
-                    {((skill.confidence || 0) * 100).toFixed(0)}%
-                  </span>
+                  <span className="badge badge--primary">{skill.category || "Unknown"}</span>
+                  <ConfidenceBadge value={skill.confidence || 0} />
                 </div>
 
-                <p className="text-white font-medium mb-2">{skill.rule}</p>
+                <p className="text-sm font-medium mb-2" style={{ color: "var(--text-primary)" }}>
+                  {skill.rule}
+                </p>
 
                 {skill.rationale && (
-                  <p className="text-text-secondary text-sm mb-3 italic">{skill.rationale}</p>
+                  <p
+                    className="text-xs leading-relaxed line-clamp-2 mb-3"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {skill.rationale}
+                  </p>
                 )}
 
                 {skill.evidence && skill.evidence.length > 0 && (
-                  <div className="border-t border-gray-800 pt-3 mt-3">
-                    <h4 className="text-xs text-text-secondary uppercase tracking-wider mb-2">
-                      Evidence ({skill.evidence.length})
-                    </h4>
-                    {skill.evidence.map((e, j) => (
-                      <p key={j} className="text-xs text-gray-400 mb-1 pl-2 border-l border-gray-700">
-                        {e}
-                      </p>
-                    ))}
+                  <div
+                    className="pt-3 mt-auto"
+                    style={{ borderTop: "1px solid var(--border)" }}
+                  >
+                    <p className="text-[10px] font-mono uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                      {skill.evidence.length} evidence source{skill.evidence.length !== 1 ? "s" : ""}
+                    </p>
                   </div>
                 )}
-              </div>
+              </GlassCard>
             ))}
           </div>
         )}
       </div>
-    </div>
+
+      {/* Detail Slide-in Panel */}
+      {selectedSkill && (
+        <div
+          className="fixed inset-0 z-50 flex"
+          onClick={() => setSelectedSkill(null)}
+        >
+          {/* Backdrop */}
+          <div
+            className="flex-1"
+            style={{ background: "rgba(0, 0, 0, 0.5)" }}
+          />
+
+          {/* Panel */}
+          <div
+            className="w-full max-w-lg overflow-y-auto animate-slide-right"
+            style={{
+              background: "var(--bg-surface)",
+              borderLeft: "1px solid var(--border)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Panel Header */}
+            <div
+              className="sticky top-0 z-10 flex items-center justify-between px-6 py-4"
+              style={{
+                background: "var(--bg-surface)",
+                borderBottom: "1px solid var(--border)",
+              }}
+            >
+              <h2 className="text-lg font-bold" style={{ color: "var(--primary)" }}>
+                Skill Detail
+              </h2>
+              <button
+                onClick={() => setSelectedSkill(null)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
+                style={{ color: "var(--text-muted)" }}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M4 4l8 8M12 4l-8 8" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Panel Body */}
+            <div className="p-6 space-y-6">
+              <div className="flex justify-between items-start">
+                <span className="badge badge--primary">{selectedSkill.category || "Unknown"}</span>
+                <ConfidenceBadge value={selectedSkill.confidence || 0} size="md" />
+              </div>
+
+              <div>
+                <p className="input-label">Rule</p>
+                <p className="text-base font-medium" style={{ color: "var(--text-primary)" }}>
+                  {selectedSkill.rule}
+                </p>
+              </div>
+
+              {selectedSkill.rationale && (
+                <div>
+                  <p className="input-label">Rationale</p>
+                  <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                    {selectedSkill.rationale}
+                  </p>
+                </div>
+              )}
+
+              {selectedSkill.evidence && selectedSkill.evidence.length > 0 && (
+                <div>
+                  <p className="input-label">
+                    Evidence ({selectedSkill.evidence.length})
+                  </p>
+                  <div className="space-y-2">
+                    {selectedSkill.evidence.map((e, j) => (
+                      <div
+                        key={j}
+                        className="text-sm p-3 rounded"
+                        style={{
+                          color: "var(--text-secondary)",
+                          background: "var(--bg-input)",
+                          border: "1px solid var(--border)",
+                        }}
+                      >
+                        {e}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedSkill.source_files && selectedSkill.source_files.length > 0 && (
+                <div>
+                  <p className="input-label">Source Files</p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedSkill.source_files.map((sf, j) => (
+                      <span key={j} className="badge badge--neutral font-mono">
+                        {sf}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ borderTop: "1px solid var(--border)", paddingTop: "24px" }}>
+                <button
+                  onClick={() => setSelectedSkill(null)}
+                  className="btn-secondary w-full"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </DashboardLayout>
   );
 }

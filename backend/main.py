@@ -1,4 +1,12 @@
-from fastapi import FastAPI, BackgroundTasks, HTTPException, UploadFile, File, Form
+from fastapi import (
+    FastAPI,
+    BackgroundTasks,
+    HTTPException,
+    UploadFile,
+    File,
+    Form,
+    Depends,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 import os
@@ -14,9 +22,26 @@ import datetime
 from backend.graph.graph import build_compilation_graph
 from backend.sse import event_bus, emit
 from backend.agent.brain_agent import handle_agent_query
-from backend.db.supabase import get_client, get_brain_by_version
-from backend.llm import check_vllm_health
-from backend.models.schemas import CompileRequest, AgentHandleRequest, AgentQueryRequest
+from backend.db.supabase import (
+    get_client,
+    get_brain_by_version,
+    get_company,
+    get_company_stats,
+    upsert_company,
+    import_skills_file,
+)
+from backend.llm import check_vllm_health, llm_call, safe_llm_json_call
+from backend.models.schemas import (
+    CompileRequest,
+    AgentHandleRequest,
+    AgentQueryRequest,
+    OnboardingAnalysisRequest,
+    CompanyUpdate,
+    SkillsImportRequest,
+    AuthRegisterRequest,
+    AuthLoginRequest,
+)
+from backend.auth.jwt import verify_token, require_auth
 
 app = FastAPI(title="Kernl API", version="2.1.0")
 
@@ -132,9 +157,6 @@ async def run_compilation_graph(job_id: str, company_id: str):
         "job_id": job_id,
         "company_id": company_id,
         "source_files": [],
-        "structured_sops": [],
-        "normalized_events": [],
-        "resolved_cases": [],
         "all_chunks": [],
         "raw_decisions": [],
         "workflow_steps": [],
@@ -335,10 +357,239 @@ async def list_brain_versions(company_id: str):
 
 
 # ─────────────────────────────────────────────
+# Phase 3 — Multi-Company & Onboarding
+# ─────────────────────────────────────────────
+ONBOARDING_SYSTEM_PROMPT = """You are an organizational analyst. Analyze the provided company documents and suggest:
+1. Industry — what sector this company operates in
+2. Departments — which departments are present or implied (e.g., Support, Engineering, HR, Finance, Sales, Marketing, Operations)
+3. Company size — estimate employee count range: "1-10", "11-50", "51-200", "201+"
+
+Output ONLY a JSON object with these exact fields:
+{
+  "industry": "string",
+  "departments": ["string"],
+  "size": "string",
+  "rationale": "string"
+}
+
+No preamble. No explanation. No markdown."""
+
+
+@app.post("/onboarding/analyze")
+async def onboarding_analyze(req: OnboardingAnalysisRequest):
+    src_dir = _company_sources_dir(req.company_id)
+    if not os.path.isdir(src_dir):
+        raise HTTPException(
+            status_code=404, detail=f"No sources found for {req.company_id}"
+        )
+
+    samples = []
+    for fn in sorted(os.listdir(src_dir)):
+        fp = os.path.join(src_dir, fn)
+        if not os.path.isfile(fp):
+            continue
+        with open(fp, "r", encoding="utf-8", errors="ignore") as f:
+            content = f.read(4000)
+        samples.append(f"--- {fn} ---\n{content}")
+
+    user_content = "Analyze these company documents:\n\n" + "\n\n".join(samples[:8])
+
+    try:
+        result = await safe_llm_json_call(
+            ONBOARDING_SYSTEM_PROMPT, user_content, max_tokens=1024
+        )
+    except Exception:
+        raise HTTPException(status_code=500, detail="Analysis failed — LLM unavailable")
+
+    if not isinstance(result, dict):
+        result = result[0] if isinstance(result, list) and result else {}
+
+    return {
+        "company_id": req.company_id,
+        "suggested_industry": result.get("industry", "Unknown"),
+        "suggested_departments": result.get("departments", []),
+        "suggested_size": result.get("size", "Unknown"),
+        "rationale": result.get("rationale", ""),
+    }
+
+
+@app.get("/companies/{company_id}")
+async def get_company_detail(company_id: str):
+    db = get_client()
+    company = get_company(company_id) if db else None
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    stats = get_company_stats(company_id) if db else {}
+    return {**company, **stats}
+
+
+@app.patch("/companies/{company_id}")
+async def update_company(company_id: str, update: CompanyUpdate):
+    db = get_client()
+    if not db:
+        raise HTTPException(status_code=500, detail="Database not connected")
+    payload = update.model_dump(exclude_none=True)
+    if not payload:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    try:
+        result = upsert_company(company_id, payload)
+    except Exception as e:
+        err_msg = str(e)
+        if "Could not find" in err_msg or "does not exist" in err_msg:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Database schema needs migration. GET /migrations/pending for SQL to run in Supabase dashboard. Error: {err_msg}",
+            )
+        raise HTTPException(
+            status_code=500, detail=f"Failed to update company: {err_msg}"
+        )
+    if not result:
+        raise HTTPException(status_code=500, detail="Failed to update company")
+    stats = get_company_stats(company_id)
+    return {**result, **stats}
+
+
+@app.post("/companies/{company_id}/load-samples")
+async def load_sample_sources(company_id: str):
+    """Clone template playbooks from rivanly-inc to a new company directory."""
+    template_dir = _company_sources_dir("rivanly-inc")
+    if not os.path.isdir(template_dir):
+        raise HTTPException(
+            status_code=404,
+            detail="Template sources not found. Ensure data/sources/rivanly-inc/ exists.",
+        )
+
+    target_dir = _company_sources_dir(company_id)
+    os.makedirs(target_dir, exist_ok=True)
+
+    copied = []
+    db = get_client()
+    for fn in sorted(os.listdir(template_dir)):
+        src = os.path.join(template_dir, fn)
+        if not os.path.isfile(src):
+            continue
+        dst = os.path.join(target_dir, fn)
+        shutil.copy2(src, dst)
+        copied.append(fn)
+
+        # Record in DB
+        if db:
+            try:
+                with open(dst, "rb") as f:
+                    file_hash = hashlib.sha256(f.read()).hexdigest()
+                db.table("source_files").insert(
+                    {
+                        "company_id": company_id,
+                        "filename": fn,
+                        "sha256": file_hash,
+                        "storage_path": f"data/sources/{company_id}/{fn}",
+                    }
+                ).execute()
+            except Exception as e:
+                print(f"[load-samples] DB record error for {fn}: {e}")
+
+    # Ensure company exists in DB
+    if db:
+        try:
+            upsert_company(
+                company_id, {"name": company_id.replace("-", " ").title()}
+            )
+        except Exception as e:
+            print(f"[load-samples] Company upsert error: {e}")
+
+    return {"status": "loaded", "files": copied, "count": len(copied)}
+
+
+
+# ─────────────────────────────────────────────
+# Phase 4 — Skills Marketplace
+# ─────────────────────────────────────────────
+
+
+@app.get("/skills/{company_id}/download")
+async def download_skills(company_id: str):
+    db = get_client()
+    if not db:
+        raise HTTPException(status_code=500, detail="Database not connected")
+    res = (
+        db.table("skills_files")
+        .select("*")
+        .eq("company_id", company_id)
+        .eq("is_current", True)
+        .execute()
+    )
+    if not res.data:
+        raise HTTPException(
+            status_code=404, detail="No skills file found for this company"
+        )
+    brain = res.data[0]
+    return StreamingResponse(
+        iter([json.dumps(brain["brain_json"], indent=2)]),
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="skills_{company_id}_{brain["version"]}.json"'
+        },
+    )
+
+
+@app.post("/skills/import")
+async def import_skills(req: SkillsImportRequest):
+    db = get_client()
+    if not db:
+        raise HTTPException(status_code=500, detail="Database not connected")
+    if not req.skills:
+        raise HTTPException(status_code=400, detail="No skills provided in payload")
+    skills_file = import_skills_file(
+        req.company_id, req.skills, req.version, req.source_label
+    )
+    if not skills_file:
+        raise HTTPException(status_code=500, detail="Failed to import skills")
+    return {
+        "status": "imported",
+        "company_id": req.company_id,
+        "version": req.version,
+        "skill_count": len(req.skills),
+        "skills_file_id": skills_file["id"],
+    }
+
+
+# ─────────────────────────────────────────────
+# Phase 6 — Auth
+# ─────────────────────────────────────────────
+
+
+@app.get("/auth/config")
+async def auth_config():
+    return {
+        "supabase_url": os.getenv("SUPABASE_URL", ""),
+        "supabase_anon_key": os.getenv("SUPABASE_KEY", ""),
+    }
+
+
+@app.get("/auth/me")
+async def auth_me(user: dict = Depends(require_auth)):
+    return {"user": user}
+
+
+@app.get("/migrations/pending")
+async def migrations_pending():
+    """Return SQL statements that need to be run in Supabase dashboard."""
+    return {
+        "database": os.getenv("SUPABASE_URL", ""),
+        "sql": [
+            "ALTER TABLE companies ADD COLUMN IF NOT EXISTS industry TEXT;",
+            "ALTER TABLE companies ADD COLUMN IF NOT EXISTS company_size TEXT;",
+            "ALTER TABLE companies ADD COLUMN IF NOT EXISTS description TEXT;",
+        ],
+        "instructions": "Run these SQL statements in your Supabase dashboard SQL editor at https://supabase.com/dashboard/project/csxswinhxuziyssuuxzx/sql/new",
+    }
+
+
+# ─────────────────────────────────────────────
 # Semantic Diff Engine
 # ─────────────────────────────────────────────
 @app.get("/diff/{v1}/{v2}")
-async def semantic_diff(v1: str, v2: str, company_id: str = "rivanly-inc"):
+async def semantic_diff(v1: str, v2: str, company_id: str):
     db = get_client()
     if not db:
         raise HTTPException(status_code=500, detail="Database not connected")

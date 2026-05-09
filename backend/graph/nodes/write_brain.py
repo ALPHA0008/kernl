@@ -4,7 +4,7 @@ import uuid
 import datetime
 from backend.graph.state import BrainState
 from backend.db.supabase import get_client
-from backend.llm import get_embedding
+from backend.llm import get_embeddings
 from backend.sse import emit
 
 
@@ -27,19 +27,20 @@ async def write_brain(state: BrainState) -> dict:
         },
     )
 
-    skills_with_embeddings = []
-    for skill in final_skills:
-        skill_text = f"{skill.get('category', '')} {skill.get('rule', '')} {skill.get('rationale', '')}"
-        emb = get_embedding(skill_text)
+    skill_texts = [
+        f"{s.get('category', '')} {s.get('rule', '')} {s.get('rationale', '')}"
+        for s in final_skills
+    ]
+    embeddings = get_embeddings(skill_texts)
+    for skill, emb in zip(final_skills, embeddings):
         skill["embedding_vector"] = emb
-        skills_with_embeddings.append(skill)
 
     skills_file = {
-        "skills": skills_with_embeddings,
+        "skills": final_skills,
         "meta": {
             "company_id": company_id,
             "compiled_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            "total_skills": len(skills_with_embeddings),
+            "total_skills": len(final_skills),
             "duration_ms": duration_ms,
         },
     }
@@ -82,9 +83,10 @@ async def write_brain(state: BrainState) -> dict:
 
         sf_id = sf_res.data[0]["id"]
 
-        for skill in skills_with_embeddings:
+        skill_rows = []
+        for skill in final_skills:
             skill_copy = {k: v for k, v in skill.items() if k != "embedding_vector"}
-            db.table("skills").insert(
+            skill_rows.append(
                 {
                     "id": skill.get("id", str(uuid.uuid4())[:8]),
                     "company_id": company_id,
@@ -95,7 +97,9 @@ async def write_brain(state: BrainState) -> dict:
                     "confidence": float(skill.get("confidence", 0.5)),
                     "skill_json": skill_copy,
                 }
-            ).execute()
+            )
+        if skill_rows:
+            db.table("skills").insert(skill_rows).execute()
 
         db.table("compile_runs").update(
             {
@@ -116,7 +120,7 @@ async def write_brain(state: BrainState) -> dict:
         "stage",
         {
             "name": "DONE",
-            "detail": f"Brain {version_str} written: {len(skills_with_embeddings)} skills, {len(source_hashes)} sources, {duration_ms}ms",
+            "detail": f"Brain {version_str} written: {len(final_skills)} skills, {len(source_hashes)} sources, {duration_ms}ms",
         },
     )
     await emit(
@@ -125,7 +129,7 @@ async def write_brain(state: BrainState) -> dict:
         {
             "status": "success",
             "version": version_str,
-            "skills_count": len(skills_with_embeddings),
+            "skills_count": len(final_skills),
             "source_count": len(source_hashes),
             "duration_ms": duration_ms,
         },

@@ -57,3 +57,59 @@ class DiffResponse(BaseModel):
     deleted: List[DiffItem] = []
     modified: List[DiffModified] = []
     confidence_shifts: List[DiffConfidenceShift] = []
+
+
+# ─────────────────────────────────────────────
+# Phase 3 — Multi-Company & Onboarding
+# ─────────────────────────────────────────────
+
+
+class OnboardingAnalysisRequest(BaseModel):
+    company_id: str
+
+
+class OnboardingSuggestion(BaseModel):
+    company_id: str
+    suggested_industry: str
+    suggested_departments: List[str]
+    suggested_size: str
+    rationale: str
+
+
+class CompanyUpdate(BaseModel):
+    name: Optional[str] = None
+    industry: Optional[str] = None
+    company_size: Optional[str] = None
+    description: Optional[str] = None
+
+
+# ─────────────────────────────────────────────
+# Phase 6 — Auth
+# ─────────────────────────────────────────────
+
+
+class AuthRegisterRequest(BaseModel):
+    email: str
+    password: str
+
+
+class AuthLoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class AuthResponse(BaseModel):
+    access_token: str
+    user: Dict[str, Any]
+
+
+# ─────────────────────────────────────────────
+# Phase 4 — Skills Marketplace
+# ─────────────────────────────────────────────
+
+
+class SkillsImportRequest(BaseModel):
+    company_id: str
+    version: str = "imported"
+    skills: List[Dict[str, Any]]
+    source_label: str = "marketplace_import"

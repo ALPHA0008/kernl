@@ -3,6 +3,9 @@
 CREATE TABLE companies (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
+  industry TEXT,
+  company_size TEXT,
+  description TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 

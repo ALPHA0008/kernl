@@ -1,20 +1,8 @@
 import os
 import hashlib
 from backend.graph.state import BrainState
+from backend.chunking import detect_doc_type
 from backend.sse import emit
-
-
-def _detect_type(filename: str) -> str:
-    fn = filename.lower()
-    if fn.endswith(".json"):
-        if "slack" in fn:
-            return "slack_json"
-        if "ticket" in fn or "zendesk" in fn:
-            return "tickets_json"
-        return "json"
-    if fn.endswith(".md"):
-        return "notion_md"
-    return "unknown"
 
 
 async def load_sources(state: BrainState) -> dict:
@@ -49,12 +37,13 @@ async def load_sources(state: BrainState) -> dict:
             continue
         with open(filepath, "r", encoding="utf-8") as f:
             content = f.read()
+        doc_type = detect_doc_type(filename, content)
         source_files.append(
             {
                 "filename": filename,
                 "content": content,
                 "sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
-                "doc_type": _detect_type(filename),
+                "doc_type": doc_type,
             }
         )
 

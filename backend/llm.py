@@ -14,7 +14,7 @@ MODEL_NAME = "RedHatAI/Qwen2.5-72B-Instruct-FP8-dynamic"
 llm = AsyncOpenAI(base_url=VLLM_BASE_URL, api_key="not-needed", timeout=120.0)
 
 # --- Concurrency throttle for parallel extraction ---
-_semaphore = asyncio.Semaphore(4)
+_semaphore = asyncio.Semaphore(8)
 
 # --- Embedding model (local, fast, centralized here) ---
 _embedding_model = None

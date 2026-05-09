@@ -2,6 +2,20 @@ from backend.graph.state import BrainState
 from backend.llm import safe_llm_json_call
 from backend.sse import emit
 
+MAX_CHUNK_CHARS = 12000
+
+
+def _cap_chunks(chunks: list[dict]) -> str:
+    parts = []
+    chars = 0
+    for c in chunks:
+        text = c.get("text", "")
+        if chars + len(text) > MAX_CHUNK_CHARS:
+            break
+        parts.append(text)
+        chars += len(text)
+    return "\n\n---\n\n".join(parts)
+
 
 SYSTEM = """You are a policy extraction specialist. Your ONLY job is to extract DECISIONS, RULES, and POLICIES from company communications.
 
@@ -29,7 +43,7 @@ async def extract_decisions(state: BrainState) -> dict:
         {"name": "EXTRACT_DECISIONS", "detail": "Extracting rules and policies..."},
     )
 
-    chunk_text = "\n\n---\n\n".join([c.get("text", "") for c in chunks])
+    chunk_text = _cap_chunks(chunks)
     user = f"Extract all decisions, rules, and policies from this company data:\n\n{chunk_text}"
 
     results = await safe_llm_json_call(SYSTEM, user, max_tokens=2048)
