@@ -5,9 +5,11 @@ import uuid
 import sys
 from dotenv import load_dotenv
 
+load_dotenv(override=True)
+
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from backend.graph.graph import build_compilation_graph
+from backend.engine.graph import build_compilation_graph
 
 
 async def run_compilation_test():
@@ -61,15 +63,17 @@ async def run_compilation_test():
     initial_state = {
         "job_id": job_id,
         "company_id": company_id,
-        "source_files": [],  # load_sources reads from disk
-        "structured_sops": [],
-        "normalized_events": [],
-        "resolved_cases": [],
+        "source_files": [],
         "all_chunks": [],
         "raw_decisions": [],
         "workflow_steps": [],
         "exception_rules": [],
         "contradictions": [],
+        "extracted_entities": [],
+        "extracted_relationships": [],
+        "extracted_authority_rules": [],
+        "operational_graph": {},
+        "operational_metadata": {},
         "draft_skills": [],
         "skills_with_evidence": [],
         "final_skills": [],
@@ -116,6 +120,14 @@ async def run_compilation_test():
             print(
                 f"\nBrain version: {skills_file.get('meta', {}).get('compiled_at', 'N/A')}"
             )
+
+        # Save brain JSON locally for eval harness (DB is unavailable)
+        local_path = os.path.join(
+            os.path.dirname(__file__), "tests", "last_compiled_brain.json"
+        )
+        with open(local_path, "w") as f:
+            json.dump(skills_file, f, indent=2)
+        print(f"Saved brain JSON -> {local_path}")
 
     except Exception as e:
         print(f"Graph execution failed: {e}")

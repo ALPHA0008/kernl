@@ -5,7 +5,7 @@ recompiling, and verifying that skills and agent answers change.
 Usage:
     python scripts/smoke_test.py
 
-Requires: backend running on http://localhost:8080
+Requires: backend running on http://localhost:8081
 """
 
 import requests
@@ -14,7 +14,7 @@ import sys
 import os
 import json
 
-API = "http://localhost:8080"
+API = "http://localhost:8081"
 COMPANY = "rivanly-inc"
 
 # Path to a source doc we'll modify
@@ -290,7 +290,7 @@ def main():
     except Exception as e:
         print(f"   [FATAL] API not reachable: {e}")
         print(
-            "   Make sure backend is running: python -m uvicorn backend.main:app --port 8080"
+            "   Make sure backend is running: python -m uvicorn backend.api:app --port 8081"
         )
         sys.exit(1)
 

@@ -1,0 +1,1566 @@
+{
+  "completed": 40,
+  "total": 40,
+  "results": [
+    {
+      "id": "REF-01",
+      "source": "notion_refund_sop.md",
+      "scenario": "Customer on an annual plan is requesting a refund. They purchased 9 days ago.",
+      "expected_action": "approve",
+      "actual_action": "The request is ambiguous because multiple operational actions (refund, approve, route, schedule) were identified with similar confidence levels. While the customer's scenario (annual plan, 9 days since purchase) aligns with the 'full refund within 14 days' policy, the constraint engine could not determine a single definitive action due to high entropy across multiple skill matches.",
+      "actual_action_type": "ambiguous",
+      "strict_pass": false,
+      "relaxed_pass": true,
+      "expected_rule_fragment": "14 days",
+      "actual_rule": "Annual plans: full refund within 14 days, prorated after 14 days.",
+      "rule_pass": true,
+      "top_retrieval_score": 0.2993,
+      "confidence": 0,
+      "skill_matched": "Support",
+      "reasoning_snippet": "The constraint engine determined the outcome to be ambiguous because the confidence scores for 'approve', 'refund', and 'route' were too close to distinguish a single primary action, resulting in high",
+      "retrieval_trace": {
+        "top_skill": "refund_policy_matrix",
+        "final_score": 0.2993,
+        "semantic_confidence": 0.4474,
+        "operational_confidence": 0.1636,
+        "why_matched": "Specificity level 2 preferred. Matched 1/2 explicit conditions",
+        "runner_up": "discount_authority_matrix",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.2597,
+          "final_score_gap": 0.0668,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": true,
+          "runner_up_scores": {
+            "semantic_confidence": 0.1877,
+            "operational_confidence": 0.2545,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "REF-02",
+      "source": "notion_refund_sop.md",
+      "scenario": "Customer on an annual plan is requesting a refund. They purchased 20 days ago.",
+      "expected_action": "approve_prorated",
+      "actual_action": "The request is ambiguous because multiple operational actions (refund, approve, route, schedule) were identified with low confidence differentials. While the customer is eligible for a prorated refund based on the annual plan policy (purchased 20 days ago, which is > 14 days), the system could not uniquely resolve a single action due to high entropy across several skill matches.",
+      "actual_action_type": "ambiguous",
+      "strict_pass": false,
+      "relaxed_pass": true,
+      "expected_rule_fragment": "prorated",
+      "actual_rule": "Annual plans: full refund within 14 days, prorated after 14 days.",
+      "rule_pass": true,
+      "top_retrieval_score": 0.2542,
+      "confidence": 0,
+      "skill_matched": "Support",
+      "reasoning_snippet": "The constraint engine determined the action is ambiguous because the confidence scores for the available actions (approve, route, schedule, refund) are too close to one another, resulting in high entr",
+      "retrieval_trace": {
+        "top_skill": "refund_policy_matrix",
+        "final_score": 0.2542,
+        "semantic_confidence": 0.4583,
+        "operational_confidence": 0.0727,
+        "why_matched": "Specificity level 2 preferred",
+        "runner_up": "discount_authority_matrix",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.2782,
+          "final_score_gap": 0.0251,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.1801,
+            "operational_confidence": 0.2545,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "REF-03",
+      "source": "notion_refund_sop.md",
+      "scenario": "An Enterprise customer is requesting a refund for their annual invoice.",
+      "expected_action": "escalate",
+      "actual_action": "Approve the refund request as the customer is on an annual plan and requested the refund within the 14-day window.",
+      "actual_action_type": "approve",
+      "strict_pass": false,
+      "relaxed_pass": false,
+      "expected_rule_fragment": "Account Manager",
+      "actual_rule": "Annual plans: full refund within 14 days",
+      "rule_pass": false,
+      "top_retrieval_score": 0.3049,
+      "confidence": 0,
+      "skill_matched": "Support",
+      "reasoning_snippet": "The constraint engine determined that the request should be approved because the customer is within the 14-day window for a full refund on an annual plan.",
+      "retrieval_trace": {
+        "top_skill": "refund_policy_matrix",
+        "final_score": 0.3049,
+        "semantic_confidence": 0.4597,
+        "operational_confidence": 0.1636,
+        "why_matched": "Specificity level 2 preferred. Matched 1/2 explicit conditions",
+        "runner_up": "vendor_invoice_approval",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.1553,
+          "final_score_gap": 0.0199,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": true,
+          "runner_up_scores": {
+            "semantic_confidence": 0.3044,
+            "operational_confidence": 0.2545,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "REF-04",
+      "source": "notion_refund_sop.md",
+      "scenario": "A customer purchased a Lifetime Deal and is now requesting a full refund.",
+      "expected_action": "deny",
+      "actual_action": "The request is ambiguous because multiple operational patterns (refund, approve, route, schedule) have similar confidence levels, and the specific policy for Lifetime Deals (LTD) suggests a strict denial, yet the system cannot determine a single definitive action path.",
+      "actual_action_type": "ambiguous",
+      "strict_pass": false,
+      "relaxed_pass": false,
+      "expected_rule_fragment": "lifetime",
+      "actual_rule": "LTD: strictly deny",
+      "rule_pass": false,
+      "top_retrieval_score": 0.2439,
+      "confidence": 0,
+      "skill_matched": "Support",
+      "reasoning_snippet": "The constraint engine identified that no single action could be determined with sufficient confidence. While the Support skill explicitly states that Lifetime Deals (LTD) should be strictly denied, th",
+      "retrieval_trace": {
+        "top_skill": "refund_policy_matrix",
+        "final_score": 0.2439,
+        "semantic_confidence": 0.4353,
+        "operational_confidence": 0.0727,
+        "why_matched": "Specificity level 2 preferred",
+        "runner_up": "discount_authority_matrix",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.2572,
+          "final_score_gap": 0.0158,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.1781,
+            "operational_confidence": 0.2545,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "REF-05",
+      "source": "notion_refund_sop.md",
+      "scenario": "A monthly plan customer who joined 2 months ago is requesting a $650 refund.",
+      "expected_action": "get_founder_approval",
+      "actual_action": "Process the refund request for the monthly plan customer.",
+      "actual_action_type": "refund",
+      "strict_pass": false,
+      "relaxed_pass": false,
+      "expected_rule_fragment": "Founder",
+      "actual_rule": "Monthly: escalate to Founder if > $500 and tenure < 3 months. All tiers: deny if purchase > 60 days.",
+      "rule_pass": true,
+      "top_retrieval_score": 0.316,
+      "confidence": 0,
+      "skill_matched": "Support",
+      "reasoning_snippet": "The constraint engine identified the 'refund' action as the most appropriate based on the customer's request for a refund and the applicable support policies for monthly plans.",
+      "retrieval_trace": {
+        "top_skill": "refund_policy_matrix",
+        "final_score": 0.316,
+        "semantic_confidence": 0.3734,
+        "operational_confidence": 0.2545,
+        "why_matched": "Specificity level 2 preferred. Matched 2/2 explicit conditions",
+        "runner_up": "discount_authority_matrix",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.165,
+          "final_score_gap": 0.0742,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": true,
+          "runner_up_scores": {
+            "semantic_confidence": 0.2084,
+            "operational_confidence": 0.2545,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "REF-06",
+      "source": "notion_refund_sop.md",
+      "scenario": "A customer is requesting a refund for a purchase they made 75 days ago.",
+      "expected_action": "deny",
+      "actual_action": "Process a prorated refund for the remaining unused months of the annual plan.",
+      "actual_action_type": "refund",
+      "strict_pass": false,
+      "relaxed_pass": false,
+      "expected_rule_fragment": "60 days",
+      "actual_rule": "Annual plans: full refund within 14 days, prorated after 14 days.",
+      "rule_pass": false,
+      "top_retrieval_score": 0.2913,
+      "confidence": 0,
+      "skill_matched": "Support",
+      "reasoning_snippet": "The constraint engine determined that a refund is the appropriate action based on the customer's annual plan status and the time elapsed since purchase (75 days), which falls into the 'prorated after ",
+      "retrieval_trace": {
+        "top_skill": "refund_policy_matrix",
+        "final_score": 0.2913,
+        "semantic_confidence": 0.4294,
+        "operational_confidence": 0.1636,
+        "why_matched": "Specificity level 2 preferred. Matched 1/2 explicit conditions",
+        "runner_up": "churn_risk_intervention",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.2571,
+          "final_score_gap": 0.1658,
+          "missing_metadata_match": true,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": true,
+          "runner_up_scores": {
+            "semantic_confidence": 0.1723,
+            "operational_confidence": 0.0727,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "REF-07",
+      "source": "notion_refund_sop.md",
+      "scenario": "Annual plan customer requesting a refund for a purchase made exactly 14 days ago",
+      "expected_action": "approve",
+      "actual_action": "The request is ambiguous because the customer is at the exact 14-day threshold. According to the policy, a 'full refund' is granted 'within 14 days,' while a 'prorated refund' applies 'after 14 days.' Since the purchase was made exactly 14 days ago, it is unclear if this qualifies as 'within' or 'after' the window. A human agent should determine if the 14th day is inclusive for a full refund or the start of the prorated period.",
+      "actual_action_type": "ambiguous",
+      "strict_pass": false,
+      "relaxed_pass": true,
+      "expected_rule_fragment": "14 days",
+      "actual_rule": "Annual plans: full refund within 14 days, prorated after 14 days.",
+      "rule_pass": true,
+      "top_retrieval_score": 0.3135,
+      "confidence": 0,
+      "skill_matched": "Support",
+      "reasoning_snippet": "The constraint engine identified an ambiguity because the scenario falls exactly on the boundary of two different refund rules (full vs. prorated). Because the confidence scores for the potential acti",
+      "retrieval_trace": {
+        "top_skill": "refund_policy_matrix",
+        "final_score": 0.3135,
+        "semantic_confidence": 0.4789,
+        "operational_confidence": 0.1636,
+        "why_matched": "Specificity level 2 preferred. Matched 1/2 explicit conditions",
+        "runner_up": "discount_authority_matrix",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.2959,
+          "final_score_gap": 0.0832,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": true,
+          "runner_up_scores": {
+            "semantic_confidence": 0.183,
+            "operational_confidence": 0.2545,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "CS-01",
+      "source": "notion_cs_playbook.md",
+      "scenario": "A customer account has shown 4 churn signals in the last 30 days: no logins, 2 s",
+      "expected_action": "schedule_am_call",
+      "actual_action": "The system cannot determine a single definitive action because the scenario triggers multiple potential operational paths. While the customer's 4 churn signals strongly suggest scheduling an AM call (Customer Success rule), the presence of a 'downgrade inquiry' and 'support escalations' overlaps with refund and approval policies. A human agent must determine if the primary goal is churn intervention (scheduling a call) or processing a financial request (refund/discount).",
+      "actual_action_type": "ambiguous",
+      "strict_pass": false,
+      "relaxed_pass": true,
+      "expected_rule_fragment": "24 hours",
+      "actual_rule": "Multi-domain overlap of churn intervention and financial request policies",
+      "rule_pass": false,
+      "top_retrieval_score": 0.4474,
+      "confidence": 0,
+      "skill_matched": "Customer Success / Support / Revenue",
+      "reasoning_snippet": "The constraint engine identified that multiple admissible actions (schedule, refund, notify, approve) are applicable due to the overlap between churn signals and the specific nature of the customer's ",
+      "retrieval_trace": {
+        "top_skill": "churn_risk_intervention",
+        "final_score": 0.4474,
+        "semantic_confidence": 0.6653,
+        "operational_confidence": 0.2545,
+        "why_matched": "Department=matched (customer_success). Specificity level 2 preferred",
+        "runner_up": "refund_policy_matrix",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.3436,
+          "final_score_gap": 0.1047,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.3217,
+            "operational_confidence": 0.3455,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "CS-02",
+      "source": "notion_cs_playbook.md",
+      "scenario": "A new Enterprise customer just signed. What does the onboarding process require?",
+      "expected_action": "initiate_enterprise_onboarding",
+      "actual_action": "Schedule a dedicated kickoff call, a customized training session, and a 30-day check-in for the new Enterprise customer.",
+      "actual_action_type": "schedule",
+      "strict_pass": false,
+      "relaxed_pass": true,
+      "expected_rule_fragment": "kickoff call",
+      "actual_rule": "All new Enterprise customers must have a dedicated kickoff call, a customized training session, and a 30-day check-in.",
+      "rule_pass": true,
+      "top_retrieval_score": 0.4786,
+      "confidence": 0,
+      "skill_matched": "Customer Success",
+      "reasoning_snippet": "The constraint engine identified that the scenario involves a new Enterprise customer, which triggers the standardized onboarding policy requiring the scheduling of a kickoff call, training, and a 30-",
+      "retrieval_trace": {
+        "top_skill": "enterprise_onboarding_requirements",
+        "final_score": 0.4786,
+        "semantic_confidence": 0.6237,
+        "operational_confidence": 0.3455,
+        "why_matched": "Department=matched (customer_success). Keywords [enterprise, onboarding] overlapped. Specificity level 2 preferred",
+        "runner_up": "eng_offer_approval",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.27,
+          "final_score_gap": 0.1714,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.3537,
+            "operational_confidence": 0.2545,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "CS-03",
+      "source": "notion_cs_playbook.md",
+      "scenario": "An account has shown 2 churn signals this month: no logins and one downgrade inq",
+      "expected_action": "monitor",
+      "actual_action": "Schedule an Account Manager (AM) call to intervene with the customer.",
+      "actual_action_type": "schedule",
+      "strict_pass": false,
+      "relaxed_pass": false,
+      "expected_rule_fragment": "3 or more",
+      "actual_rule": "If a customer exhibits 3 or more churn signals within a 30-day timeframe, an AM call must be scheduled within 24 hours.",
+      "rule_pass": true,
+      "top_retrieval_score": 0.3982,
+      "confidence": 0,
+      "skill_matched": "Customer Success",
+      "reasoning_snippet": "The constraint engine identified 'schedule' as the primary action based on the Customer Success skill patterns related to churn signal intervention.",
+      "retrieval_trace": {
+        "top_skill": "churn_risk_intervention",
+        "final_score": 0.3982,
+        "semantic_confidence": 0.5561,
+        "operational_confidence": 0.2545,
+        "why_matched": "Department=matched (customer_success). Specificity level 2 preferred",
+        "runner_up": "enterprise_onboarding_requirements",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.3623,
+          "final_score_gap": 0.163,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.1938,
+            "operational_confidence": 0.2545,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "ENG-01",
+      "source": "notion_eng_runbook.md",
+      "scenario": "An Enterprise customer just reported that their dashboard is completely down \u2014 t",
+      "expected_action": "page_on_call",
+      "actual_action": "The system cannot determine a single course of action because the scenario triggers multiple conflicting high-priority protocols: notifying the customer of an outage, paging an on-call engineer for a P0 Enterprise bug, or scheduling a follow-up. A human operator must decide whether to prioritize the immediate technical page or the customer communication.",
+      "actual_action_type": "ambiguous",
+      "strict_pass": false,
+      "relaxed_pass": true,
+      "expected_rule_fragment": "on-call engineer",
+      "actual_rule": "Multiple applicable skills with similar confidence levels (notify, page, schedule) created an ambiguous state.",
+      "rule_pass": false,
+      "top_retrieval_score": 0.3465,
+      "confidence": 0,
+      "skill_matched": "Customer Support / Engineering",
+      "reasoning_snippet": "The constraint engine identified that the scenario satisfies the conditions for three different actions (notify, page, and schedule) with very close confidence scores. Because the entropy is high (0.9",
+      "retrieval_trace": {
+        "top_skill": "outage_response_protocol",
+        "final_score": 0.3465,
+        "semantic_confidence": 0.4411,
+        "operational_confidence": 0.2545,
+        "why_matched": "severity exact match (P0). Specificity level 2 preferred",
+        "runner_up": "p0_bug_enterprise_response",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.0914,
+          "final_score_gap": 0.0161,
+          "missing_metadata_match": true,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.3497,
+            "operational_confidence": 0.3,
+            "keyword_score": 0.1667,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "ENG-02",
+      "source": "notion_eng_runbook.md",
+      "scenario": "An Enterprise customer's SLA has been breached by 2.5 hours. Who do we notify?",
+      "expected_action": "notify_am_and_eng_lead",
+      "actual_action": "Notify both the Account Manager and the Engineering Lead immediately.",
+      "actual_action_type": "notify",
+      "strict_pass": false,
+      "relaxed_pass": true,
+      "expected_rule_fragment": "Account Manager",
+      "actual_rule": "If an Enterprise customer SLA is breached by >= 2 hours, notify the Account Manager and Engineering Lead immediately.",
+      "rule_pass": true,
+      "top_retrieval_score": 0.3581,
+      "confidence": 0,
+      "skill_matched": "Engineering",
+      "reasoning_snippet": "The constraint engine determined that the 'notify' action is the correct response because the customer is an Enterprise customer and the SLA breach of 2.5 hours exceeds the 2-hour threshold defined in",
+      "retrieval_trace": {
+        "top_skill": "sla_breach_notification",
+        "final_score": 0.3581,
+        "semantic_confidence": 0.6892,
+        "operational_confidence": 0.0727,
+        "why_matched": "Specificity level 2 preferred",
+        "runner_up": "churn_risk_intervention",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.3471,
+          "final_score_gap": 0.0562,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.3421,
+            "operational_confidence": 0.2545,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "ENG-03",
+      "source": "notion_eng_runbook.md",
+      "scenario": "A customer contacts support during an active platform outage asking for troubles",
+      "expected_action": "send_incident_template",
+      "actual_action": "Send the customer the standard incident response template and provide a link to the status page instead of performing troubleshooting.",
+      "actual_action_type": "notify",
+      "strict_pass": false,
+      "relaxed_pass": true,
+      "expected_rule_fragment": "incident response template",
+      "actual_rule": "During an active platform outage, support must not troubleshoot; instead, send the standard incident response template a",
+      "rule_pass": true,
+      "top_retrieval_score": 0.4845,
+      "confidence": 0,
+      "skill_matched": "Customer Support",
+      "reasoning_snippet": "The constraint engine identified that an active platform outage is currently in progress. According to the Customer Support skill, the mandatory procedure during such outages is to avoid troubleshooti",
+      "retrieval_trace": {
+        "top_skill": "outage_response_protocol",
+        "final_score": 0.4845,
+        "semantic_confidence": 0.7478,
+        "operational_confidence": 0.2545,
+        "why_matched": "Department=matched (support). Specificity level 2 preferred",
+        "runner_up": "p0_bug_enterprise_response",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.3884,
+          "final_score_gap": 0.1748,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.3594,
+            "operational_confidence": 0.2545,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "ENG-04",
+      "source": "notion_eng_runbook.md",
+      "scenario": "A P1 bug has been reported. The feature is broken but a workaround exists. How l",
+      "expected_action": "resolve_within_4_hours",
+      "actual_action": "The P1 bug must be resolved within 4 hours.",
+      "actual_action_type": "resolve",
+      "strict_pass": false,
+      "relaxed_pass": true,
+      "expected_rule_fragment": "4 hours",
+      "actual_rule": "P1 (High) bugs must be resolved within 4 hours.",
+      "rule_pass": true,
+      "top_retrieval_score": 0.3725,
+      "confidence": 0,
+      "skill_matched": "Engineering",
+      "reasoning_snippet": "The constraint engine identified that the scenario describes a P1 bug (major feature broken with a workaround), which matches the Engineering skill rule requiring resolution within 4 hours.",
+      "retrieval_trace": {
+        "top_skill": "p1_bug_resolution_sla",
+        "final_score": 0.3725,
+        "semantic_confidence": 0.4988,
+        "operational_confidence": 0.2545,
+        "why_matched": "Department=matched (engineering). Specificity level 2 preferred",
+        "runner_up": "p0_bug_enterprise_response",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.1488,
+          "final_score_gap": 0.067,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.35,
+            "operational_confidence": 0.2545,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "HR-01",
+      "source": "notion_hr_playbook.md",
+      "scenario": "An engineering candidate has reached the offer stage. Can the recruiter send the",
+      "expected_action": "get_founder_approval",
+      "actual_action": "The recruiter may proceed with the offer, provided that Founder approval has been obtained first.",
+      "actual_action_type": "approve",
+      "strict_pass": false,
+      "relaxed_pass": true,
+      "expected_rule_fragment": "Founder approval",
+      "actual_rule": "Founder approval is required for any engineering candidate at the offer stage before the final offer letter is sent.",
+      "rule_pass": true,
+      "top_retrieval_score": 0.3261,
+      "confidence": 0,
+      "skill_matched": "HR",
+      "reasoning_snippet": "The constraint engine identified that for engineering candidates at the offer stage, the required action is to ensure Founder approval is granted before the offer letter is sent.",
+      "retrieval_trace": {
+        "top_skill": "eng_offer_approval",
+        "final_score": 0.3261,
+        "semantic_confidence": 0.3959,
+        "operational_confidence": 0.2545,
+        "why_matched": "Department=matched (hr). Specificity level 2 preferred",
+        "runner_up": "sla_breach_notification",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.2759,
+          "final_score_gap": 0.1241,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.12,
+            "operational_confidence": 0.2545,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "HR-02",
+      "source": "notion_hr_playbook.md",
+      "scenario": "An employee has missed their KPIs for two consecutive quarters. What happens nex",
+      "expected_action": "initiate_pip",
+      "actual_action": "HR must schedule a formal review with the department head within 5 business days to initiate a Performance Improvement Plan (PIP).",
+      "actual_action_type": "schedule",
+      "strict_pass": false,
+      "relaxed_pass": true,
+      "expected_rule_fragment": "Performance Improvement Plan",
+      "actual_rule": "A Performance Improvement Plan (PIP) is triggered if an employee misses core KPIs for two consecutive quarters; HR must ",
+      "rule_pass": true,
+      "top_retrieval_score": 0.3216,
+      "confidence": 0,
+      "skill_matched": "HR",
+      "reasoning_snippet": "The employee has missed KPIs for two consecutive quarters, which triggers the HR policy for a Performance Improvement Plan (PIP). According to the policy, the required next step is for HR to schedule ",
+      "retrieval_trace": {
+        "top_skill": "pip_trigger_and_review",
+        "final_score": 0.3216,
+        "semantic_confidence": 0.3857,
+        "operational_confidence": 0.2545,
+        "why_matched": "Department=matched (hr). Specificity level 2 preferred",
+        "runner_up": "eng_offer_approval",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.3399,
+          "final_score_gap": 0.153,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.0458,
+            "operational_confidence": 0.2545,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "PRICE-01",
+      "source": "notion_pricing_policy.md",
+      "scenario": "A customer is churning and has asked for a discount. Support wants to apply a 10",
+      "expected_action": "approve",
+      "actual_action": "The system cannot determine a single action because the scenario triggers multiple operational patterns: while the 10% discount for churn prevention is explicitly permitted for approval under Revenue policy, the churn signal also suggests the need to schedule an Account Manager (AM) call per Customer Success guidelines. Please clarify if the priority is immediate discount approval or scheduling a retention call.",
+      "actual_action_type": "ambiguous",
+      "strict_pass": false,
+      "relaxed_pass": true,
+      "expected_rule_fragment": "10%",
+      "actual_rule": "Support/CS can approve up to 10% for churn prevention; AM call must be scheduled if churn signals are present.",
+      "rule_pass": true,
+      "top_retrieval_score": 0.4188,
+      "confidence": 0,
+      "skill_matched": "Revenue / Customer Success",
+      "reasoning_snippet": "The constraint engine identified an ambiguity due to multi-domain overlap. The request for a 10% discount to prevent churn matches the 'approve' action in the Revenue skill, but the context of a 'chur",
+      "retrieval_trace": {
+        "top_skill": "discount_authority_matrix",
+        "final_score": 0.4188,
+        "semantic_confidence": 0.4906,
+        "operational_confidence": 0.3455,
+        "why_matched": "Department=matched (revenue). Specificity level 2 preferred. Matched 1/2 explicit conditions",
+        "runner_up": "churn_risk_intervention",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.2538,
+          "final_score_gap": 0.1642,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": true,
+          "runner_up_scores": {
+            "semantic_confidence": 0.2368,
+            "operational_confidence": 0.2545,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "PRICE-02",
+      "source": "notion_pricing_policy.md",
+      "scenario": "A customer is requesting a 35% discount. The support agent wants to approve it.",
+      "expected_action": "escalate",
+      "actual_action": "The request for a 35% discount cannot be approved by Support. According to the Revenue policy, discounts greater than 30% must be escalated to an Account Executive (AE) for approval, as Support is prohibited from approving these. However, the system has identified multiple conflicting potential actions (approve, route, notify, refund) due to low confidence in a single resolution path.",
+      "actual_action_type": "ambiguous",
+      "strict_pass": false,
+      "relaxed_pass": true,
+      "expected_rule_fragment": "Account Executive",
+      "actual_rule": "Discounts > 30% must be escalated to an AE; Support is prohibited from approving these.",
+      "rule_pass": false,
+      "top_retrieval_score": 0.3772,
+      "confidence": 0,
+      "skill_matched": "Revenue",
+      "reasoning_snippet": "The constraint engine determined the action is ambiguous because multiple skill-based actions (approve, route, notify, refund) had similar confidence scores, and the entropy was too high (0.997) to se",
+      "retrieval_trace": {
+        "top_skill": "discount_authority_matrix",
+        "final_score": 0.3772,
+        "semantic_confidence": 0.3982,
+        "operational_confidence": 0.3455,
+        "why_matched": "Department=matched (revenue). Specificity level 2 preferred. Matched 1/2 explicit conditions",
+        "runner_up": "enterprise_custom_pricing_route",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.1347,
+          "final_score_gap": 0.1106,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": true,
+          "runner_up_scores": {
+            "semantic_confidence": 0.2635,
+            "operational_confidence": 0.2545,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "PRICE-03",
+      "source": "notion_pricing_policy.md",
+      "scenario": "A pre-seed startup is asking about pricing for an annual plan.",
+      "expected_action": "approve_20_percent_startup_discount",
+      "actual_action": "You may approve a discount of up to 20% for the first year for this customer, as they are a pre-seed startup on an annual plan.",
+      "actual_action_type": "approve",
+      "strict_pass": false,
+      "relaxed_pass": true,
+      "expected_rule_fragment": "20%",
+      "actual_rule": "Early-stage startups (pre-seed/seed) on Annual plans can receive up to 20% for the first year.",
+      "rule_pass": true,
+      "top_retrieval_score": 0.3647,
+      "confidence": 0,
+      "skill_matched": "Revenue",
+      "reasoning_snippet": "The constraint engine identified that the customer meets the specific criteria for an early-stage startup (pre-seed) requesting an annual plan, which allows for an approval of up to a 20% discount per",
+      "retrieval_trace": {
+        "top_skill": "discount_authority_matrix",
+        "final_score": 0.3647,
+        "semantic_confidence": 0.4814,
+        "operational_confidence": 0.2545,
+        "why_matched": "Department=matched (revenue). Specificity level 2 preferred",
+        "runner_up": "enterprise_custom_pricing_route",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.1046,
+          "final_score_gap": 0.0471,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.3768,
+            "operational_confidence": 0.2545,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "SLACK-01",
+      "source": "slack_export_support.json",
+      "scenario": "A loyal customer who has been with us for 4 years is requesting a refund for a c",
+      "expected_action": "approve",
+      "actual_action": "The request is currently ambiguous because multiple potential actions (refund, approve, schedule, notify) have been identified with similar confidence levels. While the customer's 4-year tenure allows them to bypass the standard 30-day refund rule, and the charge occurred 45 days ago (which is within the 60-day hard limit), the system cannot definitively select a single action due to the high entropy across multiple skill-based patterns.",
+      "actual_action_type": "ambiguous",
+      "strict_pass": false,
+      "relaxed_pass": true,
+      "expected_rule_fragment": "loyal",
+      "actual_rule": "All tiers: deny if purchase > 60 days. Exception: bypass 30-day rule for customers with > 2 years tenure.",
+      "rule_pass": false,
+      "top_retrieval_score": 0.2474,
+      "confidence": 0,
+      "skill_matched": "Support",
+      "reasoning_snippet": "The constraint engine determined the action to be ambiguous because the confidence scores for 'refund' (0.22) and 'approve' (0.21) are too close to distinguish a clear winner, resulting in high entrop",
+      "retrieval_trace": {
+        "top_skill": "refund_policy_matrix",
+        "final_score": 0.2474,
+        "semantic_confidence": 0.4431,
+        "operational_confidence": 0.0727,
+        "why_matched": "Specificity level 2 preferred",
+        "runner_up": "vendor_invoice_approval",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.2497,
+          "final_score_gap": 0.0124,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.1934,
+            "operational_confidence": 0.2545,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "OPS-01",
+      "source": "slack_export_ops.json",
+      "scenario": "Finance has received a software vendor invoice for $4,200. Who needs to approve ",
+      "expected_action": "route_to_ops_lead",
+      "actual_action": "The invoice must be routed to the ops lead for approval before payment.",
+      "actual_action_type": "approve",
+      "strict_pass": false,
+      "relaxed_pass": true,
+      "expected_rule_fragment": "ops lead",
+      "actual_rule": "Any software vendor invoice of $3,500 or more must be routed to the ops lead for approval before payment by finance.",
+      "rule_pass": true,
+      "top_retrieval_score": 0.5043,
+      "confidence": 0,
+      "skill_matched": "Finance",
+      "reasoning_snippet": "The constraint engine identified that the invoice amount ($4,200) exceeds the $3,500 threshold for software vendor invoices, triggering the requirement for approval from the ops lead.",
+      "retrieval_trace": {
+        "top_skill": "vendor_invoice_approval",
+        "final_score": 0.5043,
+        "semantic_confidence": 0.7361,
+        "operational_confidence": 0.3,
+        "why_matched": "Department=matched (finance). Keywords [finance] overlapped. Specificity level 2 preferred",
+        "runner_up": "discount_authority_matrix",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.4062,
+          "final_score_gap": 0.3078,
+          "missing_metadata_match": true,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.3299,
+            "operational_confidence": 0.0727,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "ENG-ADV-01",
+      "source": "notion_eng_runbook.md",
+      "scenario": "A minor display bug is affecting less than 5% of users. The UI is partially brok",
+      "expected_action": "resolve_within_4_hours",
+      "actual_action": "The issue should be resolved following the standard engineering bug resolution process, as it is a P2 bug with a known workaround and limited user impact.",
+      "actual_action_type": "resolve",
+      "strict_pass": false,
+      "relaxed_pass": false,
+      "expected_rule_fragment": "4 hours",
+      "actual_rule": "P1 (High) bugs must be resolved within 4 hours.",
+      "rule_pass": true,
+      "top_retrieval_score": 0.3265,
+      "confidence": 0,
+      "skill_matched": "Engineering",
+      "reasoning_snippet": "The constraint engine determined that the most appropriate action is to 'resolve' the issue. This decision is based on the engineering skill set for bug management, as the scenario describes a non-cri",
+      "retrieval_trace": {
+        "top_skill": "p1_bug_resolution_sla",
+        "final_score": 0.3265,
+        "semantic_confidence": 0.3966,
+        "operational_confidence": 0.2545,
+        "why_matched": "Department=matched (engineering). Specificity level 2 preferred",
+        "runner_up": "p0_bug_enterprise_response",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.1272,
+          "final_score_gap": 0.0572,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.2694,
+            "operational_confidence": 0.2545,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "REF-ADV-01",
+      "source": "notion_refund_sop.md",
+      "scenario": "An Enterprise account manager is requesting a refund on behalf of their enterpri",
+      "expected_action": "escalate",
+      "actual_action": "Approve the refund request as it has been initiated by the Enterprise account manager for a payment made within the allowable window.",
+      "actual_action_type": "approve",
+      "strict_pass": false,
+      "relaxed_pass": false,
+      "expected_rule_fragment": "Account Manager",
+      "actual_rule": "Enterprise refund requests are typically managed by the Account Manager; since the request is coming from the AM themsel",
+      "rule_pass": true,
+      "top_retrieval_score": 0.3759,
+      "confidence": 0,
+      "skill_matched": "Finance",
+      "reasoning_snippet": "The constraint engine selected 'approve' based on the skill-based retrieval patterns. While the support skill suggests escalation for Enterprise refunds, the request is already being made by the Accou",
+      "retrieval_trace": {
+        "top_skill": "refund_policy_matrix",
+        "final_score": 0.3759,
+        "semantic_confidence": 0.5064,
+        "operational_confidence": 0.2545,
+        "why_matched": "Specificity level 2 preferred. Matched 1/2 explicit conditions",
+        "runner_up": "vendor_invoice_approval",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.1404,
+          "final_score_gap": 0.0132,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": true,
+          "runner_up_scores": {
+            "semantic_confidence": 0.366,
+            "operational_confidence": 0.3455,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "HR-ADV-01",
+      "source": "notion_hr_playbook.md",
+      "scenario": "A product manager candidate has completed all interview rounds and the team is r",
+      "expected_action": "get_founder_approval",
+      "actual_action": "The recruiter may proceed with sending the offer letter to the product manager candidate.",
+      "actual_action_type": "approve",
+      "strict_pass": false,
+      "relaxed_pass": false,
+      "expected_rule_fragment": "Founder approval",
+      "actual_rule": "Founder approval is required for any engineering candidate at the offer stage before the final offer letter is sent.",
+      "rule_pass": true,
+      "top_retrieval_score": 0.3265,
+      "confidence": 0,
+      "skill_matched": "HR",
+      "reasoning_snippet": "The constraint engine approved the action because the restriction requiring Founder approval applies specifically to engineering candidates. Since the candidate in this scenario is a product manager, ",
+      "retrieval_trace": {
+        "top_skill": "eng_offer_approval",
+        "final_score": 0.3265,
+        "semantic_confidence": 0.2856,
+        "operational_confidence": 0.3455,
+        "why_matched": "Department=matched (hr). Specificity level 2 preferred",
+        "runner_up": "enterprise_custom_pricing_route",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.0101,
+          "final_score_gap": 0.1045,
+          "missing_metadata_match": true,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.2755,
+            "operational_confidence": 0.1636,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "CS-ADV-01",
+      "source": "notion_cs_playbook.md",
+      "scenario": "A customer account has shown exactly 2 churn signals this week: they haven't log",
+      "expected_action": "monitor",
+      "actual_action": "Schedule an Account Manager (AM) call to intervene and address the churn signals identified in the account.",
+      "actual_action_type": "schedule",
+      "strict_pass": false,
+      "relaxed_pass": false,
+      "expected_rule_fragment": "3 or more",
+      "actual_rule": "If a customer exhibits 3 or more churn signals within a 30-day timeframe, an AM call must be scheduled within 24 hours.",
+      "rule_pass": true,
+      "top_retrieval_score": 0.4308,
+      "confidence": 0,
+      "skill_matched": "Customer Success",
+      "reasoning_snippet": "The constraint engine has determined that the appropriate action is to schedule a call based on the identified churn signals, mapping to the Customer Success intervention protocol.",
+      "retrieval_trace": {
+        "top_skill": "churn_risk_intervention",
+        "final_score": 0.4308,
+        "semantic_confidence": 0.6284,
+        "operational_confidence": 0.2545,
+        "why_matched": "Department=matched (customer_success). Specificity level 2 preferred",
+        "runner_up": "outage_response_protocol",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.3531,
+          "final_score_gap": 0.1589,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.2753,
+            "operational_confidence": 0.2545,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "PRICE-ADV-01",
+      "source": "notion_pricing_policy.md",
+      "scenario": "A Series A startup is requesting a 25% discount on their annual plan. The CS rep",
+      "expected_action": "escalate",
+      "actual_action": "Route this request to a higher authority (such as an Account Executive) for approval.",
+      "actual_action_type": "route",
+      "strict_pass": false,
+      "relaxed_pass": false,
+      "expected_rule_fragment": "Account Executive",
+      "actual_rule": "Support/CS can approve up to 10% for churn prevention; early-stage startups (pre-seed/seed) can receive up to 20%. Disco",
+      "rule_pass": false,
+      "top_retrieval_score": 0.3683,
+      "confidence": 0,
+      "skill_matched": "Revenue",
+      "reasoning_snippet": "The constraint engine determined that the request should be routed because the 25% discount exceeds the maximum approval limit for CS reps (10%) and the maximum limit for early-stage startups (20% for",
+      "retrieval_trace": {
+        "top_skill": "discount_authority_matrix",
+        "final_score": 0.3683,
+        "semantic_confidence": 0.4895,
+        "operational_confidence": 0.2545,
+        "why_matched": "Department=matched (revenue). Specificity level 2 preferred",
+        "runner_up": "enterprise_custom_pricing_route",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.1302,
+          "final_score_gap": 0.0586,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.3593,
+            "operational_confidence": 0.2545,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "DET-01",
+      "source": "notion_eng_runbook.md",
+      "scenario": "A P1 bug has been reported. Should we resolve it within 4 hours or notify the AM",
+      "expected_action": "ambiguous",
+      "actual_action": "A definitive action cannot be determined because the scenario presents a choice between two valid operational paths: resolving the P1 bug within 4 hours (per Engineering SLA) or notifying the AM and Engineering Lead (which occurs upon SLA breach).",
+      "actual_action_type": "ambiguous",
+      "strict_pass": true,
+      "relaxed_pass": false,
+      "expected_rule_fragment": "",
+      "actual_rule": "P1 (High) bugs must be resolved within 4 hours; Enterprise customer SLA breaches >= 2 hours require notification of AM a",
+      "rule_pass": false,
+      "top_retrieval_score": 0.4478,
+      "confidence": 0,
+      "skill_matched": "Engineering",
+      "reasoning_snippet": "The constraint engine identified an ambiguity because the input explicitly asks for a choice between two different policy-driven actions ('resolve' vs 'notify'). Since both are supported by retrieved ",
+      "retrieval_trace": {
+        "top_skill": "p1_bug_resolution_sla",
+        "final_score": 0.4478,
+        "semantic_confidence": 0.6661,
+        "operational_confidence": 0.2545,
+        "why_matched": "Department=matched (engineering). Specificity level 2 preferred",
+        "runner_up": "p0_bug_enterprise_response",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.1683,
+          "final_score_gap": 0.0258,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.4978,
+            "operational_confidence": 0.3455,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "DET-02",
+      "source": "notion_hr_playbook.md",
+      "scenario": "We need to escalate the candidate's offer for final sign-off.",
+      "expected_action": "ambiguous",
+      "actual_action": "The request to escalate a candidate's offer for final sign-off is ambiguous because multiple operational actions (approve, route, refund) were identified with low confidence scores. While the scenario specifically mentions an 'offer' stage\u2014which aligns with the HR policy requiring Founder approval\u2014the system cannot definitively isolate a single action due to the high entropy across different skill categories.",
+      "actual_action_type": "ambiguous",
+      "strict_pass": true,
+      "relaxed_pass": true,
+      "expected_rule_fragment": "",
+      "actual_rule": "Founder approval is required for any engineering candidate at the offer stage before the final offer letter is sent.",
+      "rule_pass": false,
+      "top_retrieval_score": 0.2095,
+      "confidence": 0,
+      "skill_matched": "HR",
+      "reasoning_snippet": "The constraint engine determined the action is ambiguous because no single action reached a sufficient confidence threshold. Although the HR skill regarding Founder approval for offers is the most sem",
+      "retrieval_trace": {
+        "top_skill": "eng_offer_approval",
+        "final_score": 0.2095,
+        "semantic_confidence": 0.2478,
+        "operational_confidence": 0.1636,
+        "why_matched": "Specificity level 2 preferred",
+        "runner_up": "enterprise_custom_pricing_route",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.0523,
+          "final_score_gap": 0.0235,
+          "missing_metadata_match": true,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.1955,
+            "operational_confidence": 0.1636,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "DET-03",
+      "source": "notion_cs_playbook.md",
+      "scenario": "A customer wrote in. Please handle this appropriately.",
+      "expected_action": "ambiguous",
+      "actual_action": "The request is too vague to determine a specific action. Depending on the customer's actual need, this could require routing to Sales for pricing, paging an engineer for a critical bug, notifying leads of an SLA breach, or approving a discount for churn prevention.",
+      "actual_action_type": "ambiguous",
+      "strict_pass": true,
+      "relaxed_pass": false,
+      "expected_rule_fragment": "",
+      "actual_rule": "vague_phrasing",
+      "rule_pass": false,
+      "top_retrieval_score": 0.1468,
+      "confidence": 0,
+      "skill_matched": "multiple skills",
+      "reasoning_snippet": "The constraint engine determined the request is ambiguous because the input provides no specific details (e.g., bug report, pricing request, or SLA breach) to trigger a single policy. Multiple admissi",
+      "retrieval_trace": {
+        "top_skill": "enterprise_custom_pricing_route",
+        "final_score": 0.1468,
+        "semantic_confidence": 0.2196,
+        "operational_confidence": 0.0727,
+        "why_matched": "Specificity level 2 preferred",
+        "runner_up": "p0_bug_enterprise_response",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.0195,
+          "final_score_gap": 0.0088,
+          "missing_metadata_match": true,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.2001,
+            "operational_confidence": 0.0727,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "DET-04",
+      "source": "notion_refund_sop.md",
+      "scenario": "An enterprise customer with 4 churn signals is requesting a refund.",
+      "expected_action": "ambiguous",
+      "actual_action": "Schedule an Account Manager (AM) call within 24 hours.",
+      "actual_action_type": "schedule",
+      "strict_pass": false,
+      "relaxed_pass": false,
+      "expected_rule_fragment": "",
+      "actual_rule": "If a customer exhibits 3 or more churn signals within a 30-day timeframe, an AM call must be scheduled within 24 hours.",
+      "rule_pass": false,
+      "top_retrieval_score": 0.3354,
+      "confidence": 0,
+      "skill_matched": "Customer Success",
+      "reasoning_snippet": "The customer has 4 churn signals, which exceeds the threshold of 3 signals defined in the Customer Success policy. Therefore, the constraint engine has prioritized scheduling an AM call for interventi",
+      "retrieval_trace": {
+        "top_skill": "churn_risk_intervention",
+        "final_score": 0.3354,
+        "semantic_confidence": 0.4165,
+        "operational_confidence": 0.2545,
+        "why_matched": "Department=matched (customer_success). Specificity level 2 preferred",
+        "runner_up": "enterprise_onboarding_requirements",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.1902,
+          "final_score_gap": 0.0606,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.2263,
+            "operational_confidence": 0.3,
+            "keyword_score": 0.1667,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "DET-05",
+      "source": "notion_pricing_policy.md",
+      "scenario": "A customer wants exactly a 30% discount on their renewal.",
+      "expected_action": "ambiguous",
+      "actual_action": "The request for a 30% discount falls into a gray area of the current policy. While Support/CS can approve up to 10% (or 20% for early-stage startups), the policy explicitly states that discounts GREATER than 30% must be escalated to an AE. Because the request is for EXACTLY 30%, it is unclear if this can be approved by Support or if it requires AE escalation. Please clarify the threshold for the 30% boundary.",
+      "actual_action_type": "ambiguous",
+      "strict_pass": true,
+      "relaxed_pass": false,
+      "expected_rule_fragment": "",
+      "actual_rule": "Discounts > 30% must be escalated to an AE; Support is prohibited from approving these.",
+      "rule_pass": false,
+      "top_retrieval_score": 0.3245,
+      "confidence": 0,
+      "skill_matched": "Revenue",
+      "reasoning_snippet": "The constraint engine determined the action is ambiguous because the request is for exactly 30%, which sits precisely on the boundary of the escalation rule ('greater than 30%'). This creates a confli",
+      "retrieval_trace": {
+        "top_skill": "discount_authority_matrix",
+        "final_score": 0.3245,
+        "semantic_confidence": 0.3922,
+        "operational_confidence": 0.2545,
+        "why_matched": "Department=matched (revenue). Specificity level 2 preferred",
+        "runner_up": "enterprise_custom_pricing_route",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.097,
+          "final_score_gap": 0.0436,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.2952,
+            "operational_confidence": 0.2545,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "DET-06",
+      "source": "notion_cs_playbook.md",
+      "scenario": "An enterprise customer has a major billing issue.",
+      "expected_action": "ambiguous",
+      "actual_action": "A human agent must review the specific details of the billing issue to determine if it requires financial approval (Finance), a pricing negotiation route (Revenue), or a customer success intervention (Customer Success).",
+      "actual_action_type": "ambiguous",
+      "strict_pass": true,
+      "relaxed_pass": false,
+      "expected_rule_fragment": "",
+      "actual_rule": "Multiple conflicting skill matches",
+      "rule_pass": false,
+      "top_retrieval_score": 0.2754,
+      "confidence": 0,
+      "skill_matched": "Finance, Customer Success, Revenue",
+      "reasoning_snippet": "The constraint engine determined the action is ambiguous because the scenario ('enterprise customer with a major billing issue') triggers multiple potential policy paths with similar confidence levels",
+      "retrieval_trace": {
+        "top_skill": "vendor_invoice_approval",
+        "final_score": 0.2754,
+        "semantic_confidence": 0.2831,
+        "operational_confidence": 0.2545,
+        "why_matched": "Department=matched (finance). Specificity level 2 preferred",
+        "runner_up": "enterprise_onboarding_requirements",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.0955,
+          "final_score_gap": 0.018,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.1876,
+            "operational_confidence": 0.3,
+            "keyword_score": 0.1667,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "COND-01",
+      "source": "notion_refund_sop.md",
+      "scenario": "Customer asking for a refund exactly 14 days after purchase.",
+      "expected_action": "approve",
+      "actual_action": "Process a full refund for the customer.",
+      "actual_action_type": "refund",
+      "strict_pass": false,
+      "relaxed_pass": true,
+      "expected_rule_fragment": "14 days",
+      "actual_rule": "Annual plans: full refund within 14 days",
+      "rule_pass": true,
+      "top_retrieval_score": 0.3124,
+      "confidence": 0,
+      "skill_matched": "Support",
+      "reasoning_snippet": "The constraint engine determined that a refund is appropriate because the request was made exactly 14 days after purchase, which falls within the 'within 14 days' window for a full refund according to",
+      "retrieval_trace": {
+        "top_skill": "refund_policy_matrix",
+        "final_score": 0.3124,
+        "semantic_confidence": 0.4764,
+        "operational_confidence": 0.1636,
+        "why_matched": "Specificity level 2 preferred. Matched 1/2 explicit conditions",
+        "runner_up": "churn_risk_intervention",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.1771,
+          "final_score_gap": 0.1297,
+          "missing_metadata_match": true,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": true,
+          "runner_up_scores": {
+            "semantic_confidence": 0.2993,
+            "operational_confidence": 0.0727,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "COND-02",
+      "source": "notion_refund_sop.md",
+      "scenario": "Customer asking for a refund 15 days after purchase.",
+      "expected_action": "approve_prorated",
+      "actual_action": "Schedule a call with the Account Manager (AM) within 24 hours.",
+      "actual_action_type": "schedule",
+      "strict_pass": false,
+      "relaxed_pass": false,
+      "expected_rule_fragment": "prorated",
+      "actual_rule": "If a customer exhibits 3 or more churn signals (e.g., no logins, support ticket escalations, downgrade inquiries) within",
+      "rule_pass": false,
+      "top_retrieval_score": 0.2592,
+      "confidence": 0,
+      "skill_matched": "Customer Success",
+      "reasoning_snippet": "The constraint engine has determined that the appropriate action is to schedule a follow-up, as the request for a refund serves as a churn signal triggering the Customer Success protocol for AM interv",
+      "retrieval_trace": {
+        "top_skill": "refund_policy_matrix",
+        "final_score": 0.2592,
+        "semantic_confidence": 0.4694,
+        "operational_confidence": 0.0727,
+        "why_matched": "Specificity level 2 preferred",
+        "runner_up": "churn_risk_intervention",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.1866,
+          "final_score_gap": 0.084,
+          "missing_metadata_match": true,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.2828,
+            "operational_confidence": 0.0727,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "COND-03",
+      "source": "notion_refund_sop.md",
+      "scenario": "Refund request for exactly $500.",
+      "expected_action": "approve",
+      "actual_action": "A human agent must review the request because the available policy skills provide multiple conflicting or incomplete paths (refund, approve, notify, route) without sufficient customer data (plan type, tenure, or purchase date) to determine which specific rule applies.",
+      "actual_action_type": "ambiguous",
+      "strict_pass": false,
+      "relaxed_pass": true,
+      "expected_rule_fragment": "refund",
+      "actual_rule": "Multiple conflicting skills matched with insufficient context.",
+      "rule_pass": false,
+      "top_retrieval_score": 0.1709,
+      "confidence": 0,
+      "skill_matched": "Support",
+      "reasoning_snippet": "The constraint engine determined the action is ambiguous because the input (a $500 refund request) triggers multiple potential operational paths across different skills, but lacks the necessary metada",
+      "retrieval_trace": {
+        "top_skill": "refund_policy_matrix",
+        "final_score": 0.1709,
+        "semantic_confidence": 0.2731,
+        "operational_confidence": 0.0727,
+        "why_matched": "Specificity level 2 preferred",
+        "runner_up": "vendor_invoice_approval",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.0093,
+          "final_score_gap": 0.0042,
+          "missing_metadata_match": true,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.2638,
+            "operational_confidence": 0.0727,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "COND-04",
+      "source": "notion_refund_sop.md",
+      "scenario": "Refund request for $501.",
+      "expected_action": "get_founder_approval",
+      "actual_action": "Process the refund request for $501.",
+      "actual_action_type": "refund",
+      "strict_pass": false,
+      "relaxed_pass": false,
+      "expected_rule_fragment": "$500",
+      "actual_rule": "Annual plans: full refund within 14 days, prorated after 14 days. Monthly: escalate to Founder if > $500 and tenure < 3 ",
+      "rule_pass": true,
+      "top_retrieval_score": 0.2399,
+      "confidence": 0,
+      "skill_matched": "Support",
+      "reasoning_snippet": "The constraint engine has determined that a refund is the appropriate action based on the retrieved support skills for the requested amount of $501.",
+      "retrieval_trace": {
+        "top_skill": "refund_policy_matrix",
+        "final_score": 0.2399,
+        "semantic_confidence": 0.2042,
+        "operational_confidence": 0.2545,
+        "why_matched": "Specificity level 2 preferred. Matched 1/1 explicit conditions",
+        "runner_up": "vendor_invoice_approval",
+        "why_runner_up_lost": {
+          "semantic_gap": -0.0512,
+          "final_score_gap": 0.077,
+          "missing_metadata_match": true,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": true,
+          "runner_up_scores": {
+            "semantic_confidence": 0.2554,
+            "operational_confidence": 0.0727,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "COND-05",
+      "source": "notion_pricing_policy.md",
+      "scenario": "Discount request for exactly 30%.",
+      "expected_action": "ambiguous",
+      "actual_action": "The request for exactly 30% discount falls into a grey area: it exceeds the 10-20% approval limits for Support/CS, but the policy specifically mandates escalation only for discounts 'greater than 30%'. Please clarify if a 30% discount can be approved by Support or if it requires AE escalation.",
+      "actual_action_type": "ambiguous",
+      "strict_pass": true,
+      "relaxed_pass": false,
+      "expected_rule_fragment": "",
+      "actual_rule": "Support/CS can approve up to 10% (churn) or 20% (early-stage startups); discounts > 30% must be escalated to an AE.",
+      "rule_pass": false,
+      "top_retrieval_score": 0.3148,
+      "confidence": 0,
+      "skill_matched": "Revenue",
+      "reasoning_snippet": "The constraint engine determined the action is ambiguous because the request is for exactly 30%. The policy provides clear ceilings for Support (10-20%) and a clear floor for escalation (>30%), leavin",
+      "retrieval_trace": {
+        "top_skill": "discount_authority_matrix",
+        "final_score": 0.3148,
+        "semantic_confidence": 0.3706,
+        "operational_confidence": 0.2545,
+        "why_matched": "Department=matched (revenue). Specificity level 2 preferred",
+        "runner_up": "enterprise_custom_pricing_route",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.1531,
+          "final_score_gap": 0.0689,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.2175,
+            "operational_confidence": 0.2545,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "COND-06",
+      "source": "notion_refund_sop.md",
+      "scenario": "Refund request 60 days after purchase.",
+      "expected_action": "deny",
+      "actual_action": "Process a prorated refund for the customer.",
+      "actual_action_type": "refund",
+      "strict_pass": false,
+      "relaxed_pass": false,
+      "expected_rule_fragment": "60 days",
+      "actual_rule": "Annual plans: full refund within 14 days, prorated after 14 days. All tiers: deny if purchase > 60 days.",
+      "rule_pass": true,
+      "top_retrieval_score": 0.2737,
+      "confidence": 0,
+      "skill_matched": "Support",
+      "reasoning_snippet": "The request was made 60 days after purchase. According to the policy, refunds are denied only if the purchase is greater than 60 days. Since this request is exactly at the 60-day limit, it is still el",
+      "retrieval_trace": {
+        "top_skill": "refund_policy_matrix",
+        "final_score": 0.2737,
+        "semantic_confidence": 0.5015,
+        "operational_confidence": 0.0727,
+        "why_matched": "Specificity level 2 preferred",
+        "runner_up": "churn_risk_intervention",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.2538,
+          "final_score_gap": 0.1143,
+          "missing_metadata_match": true,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.2477,
+            "operational_confidence": 0.0727,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "COND-07",
+      "source": "notion_refund_sop.md",
+      "scenario": "Refund request for a lifetime deal.",
+      "expected_action": "deny",
+      "actual_action": "A human agent must review this request because the system cannot determine a single definitive action. While one policy suggests strictly denying refunds for Lifetime Deals (LTD), other retrieved patterns suggest potential approval, routing, or notification paths based on different customer segments or scenarios, and no single rule has a dominant confidence score to override the others.",
+      "actual_action_type": "ambiguous",
+      "strict_pass": false,
+      "relaxed_pass": true,
+      "expected_rule_fragment": "lifetime",
+      "actual_rule": "Multiple conflicting skills retrieved for refund/approval requests",
+      "rule_pass": false,
+      "top_retrieval_score": 0.2323,
+      "confidence": 0,
+      "skill_matched": "Revenue/Support",
+      "reasoning_snippet": "The constraint engine determined the request is ambiguous because multiple admissible actions (approve, route, refund, notify) were identified with very similar confidence levels, and the entropy is h",
+      "retrieval_trace": {
+        "top_skill": "discount_authority_matrix",
+        "final_score": 0.2323,
+        "semantic_confidence": 0.1874,
+        "operational_confidence": 0.2545,
+        "why_matched": "Department=matched (revenue). Specificity level 2 preferred",
+        "runner_up": "enterprise_custom_pricing_route",
+        "why_runner_up_lost": {
+          "semantic_gap": 0.0337,
+          "final_score_gap": 0.0151,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": false,
+          "runner_up_scores": {
+            "semantic_confidence": 0.1537,
+            "operational_confidence": 0.2545,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": "COND-08",
+      "source": "notion_cs_playbook.md",
+      "scenario": "Enterprise customer with 3 churn signals.",
+      "expected_action": "schedule_am_call",
+      "actual_action": "Schedule an Account Manager (AM) call within 24 hours to intervene and address the churn signals.",
+      "actual_action_type": "schedule",
+      "strict_pass": false,
+      "relaxed_pass": true,
+      "expected_rule_fragment": "AM call",
+      "actual_rule": "If a customer exhibits 3 or more churn signals within a 30-day timeframe, an AM call must be scheduled within 24 hours.",
+      "rule_pass": true,
+      "top_retrieval_score": 0.4231,
+      "confidence": 0,
+      "skill_matched": "Customer Success",
+      "reasoning_snippet": "The constraint engine determined that the most appropriate action is to schedule a call because the customer has reached the threshold of 3 churn signals, triggering the specific SLA for an Account Ma",
+      "retrieval_trace": {
+        "top_skill": "enterprise_onboarding_requirements",
+        "final_score": 0.4231,
+        "semantic_confidence": 0.3336,
+        "operational_confidence": 0.4818,
+        "why_matched": "Department=matched (customer_success). Keywords [enterprise] overlapped. Specificity level 2 preferred. Matched 1/1 explicit conditions",
+        "runner_up": "churn_risk_intervention",
+        "why_runner_up_lost": {
+          "semantic_gap": -0.1315,
+          "final_score_gap": 0.0658,
+          "missing_metadata_match": false,
+          "severity_mismatch": false,
+          "lower_specificity": false,
+          "condition_gap": true,
+          "runner_up_scores": {
+            "semantic_confidence": 0.4651,
+            "operational_confidence": 0.2545,
+            "keyword_score": 0.0,
+            "condition_score": 0.0
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,1233 @@
+{
+  "timestamp": "2026-06-15T11:31:36.117708",
+  "total_scenarios": 40,
+  "strict_passed": 25,
+  "accuracy_pct": 62.5,
+  "results": [
+    {
+      "id": "REF-01",
+      "expected_action": "approve",
+      "actual_action": "approve",
+      "is_ambiguous": false,
+      "pass": true,
+      "entropy": 0.9636,
+      "resolution_source": "skill",
+      "primary_confidence": 0.2883,
+      "all_admissible": [
+        {
+          "action": "approve",
+          "confidence": 0.2883,
+          "source": "skill"
+        },
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.2159,
+          "source": "skill"
+        },
+        {
+          "action": "deny",
+          "confidence": 0.1409,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "REF-02",
+      "expected_action": "approve_prorated",
+      "actual_action": "ambiguous",
+      "is_ambiguous": true,
+      "pass": false,
+      "entropy": 0.9846,
+      "resolution_source": "skill",
+      "primary_confidence": null,
+      "all_admissible": [
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.2149,
+          "source": "skill"
+        },
+        {
+          "action": "approve",
+          "confidence": 0.2112,
+          "source": "skill"
+        },
+        {
+          "action": "deny",
+          "confidence": 0.1412,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "REF-03",
+      "expected_action": "escalate",
+      "actual_action": "route_to_ops_lead",
+      "is_ambiguous": false,
+      "pass": false,
+      "entropy": 0.9763,
+      "resolution_source": "skill",
+      "primary_confidence": 0.2804,
+      "all_admissible": [
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.2804,
+          "source": "skill"
+        },
+        {
+          "action": "initiate_enterprise_onboarding",
+          "confidence": 0.2314,
+          "source": "skill"
+        },
+        {
+          "action": "approve",
+          "confidence": 0.2238,
+          "source": "skill"
+        },
+        {
+          "action": "deny",
+          "confidence": 0.1319,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "REF-04",
+      "expected_action": "deny",
+      "actual_action": "route_to_ops_lead",
+      "is_ambiguous": false,
+      "pass": false,
+      "entropy": 0.988,
+      "resolution_source": "skill",
+      "primary_confidence": 0.2014,
+      "all_admissible": [
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.2014,
+          "source": "skill"
+        },
+        {
+          "action": "deny",
+          "confidence": 0.1487,
+          "source": "skill"
+        },
+        {
+          "action": "approve",
+          "confidence": 0.1405,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "REF-05",
+      "expected_action": "get_founder_approval",
+      "actual_action": "approve",
+      "is_ambiguous": false,
+      "pass": false,
+      "entropy": 0.9931,
+      "resolution_source": "skill",
+      "primary_confidence": 0.3,
+      "all_admissible": [
+        {
+          "action": "approve",
+          "confidence": 0.3,
+          "source": "skill"
+        },
+        {
+          "action": "deny",
+          "confidence": 0.259,
+          "source": "skill"
+        },
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.2214,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "REF-06",
+      "expected_action": "deny",
+      "actual_action": "deny",
+      "is_ambiguous": false,
+      "pass": true,
+      "entropy": 0.9469,
+      "resolution_source": "skill",
+      "primary_confidence": 0.3724,
+      "all_admissible": [
+        {
+          "action": "deny",
+          "confidence": 0.3724,
+          "source": "skill"
+        },
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.2012,
+          "source": "skill"
+        },
+        {
+          "action": "approve",
+          "confidence": 0.1982,
+          "source": "skill"
+        },
+        {
+          "action": "schedule_am_call",
+          "confidence": 0.1308,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "REF-07",
+      "expected_action": "approve",
+      "actual_action": "approve",
+      "is_ambiguous": false,
+      "pass": true,
+      "entropy": 0.9601,
+      "resolution_source": "skill",
+      "primary_confidence": 0.2987,
+      "all_admissible": [
+        {
+          "action": "approve",
+          "confidence": 0.2987,
+          "source": "skill"
+        },
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.2042,
+          "source": "skill"
+        },
+        {
+          "action": "deny",
+          "confidence": 0.1434,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "CS-01",
+      "expected_action": "schedule_am_call",
+      "actual_action": "schedule_am_call",
+      "is_ambiguous": false,
+      "pass": true,
+      "entropy": 0.9531,
+      "resolution_source": "skill",
+      "primary_confidence": 0.4988,
+      "all_admissible": [
+        {
+          "action": "schedule_am_call",
+          "confidence": 0.4988,
+          "source": "skill"
+        },
+        {
+          "action": "initiate_enterprise_onboarding",
+          "confidence": 0.2589,
+          "source": "skill"
+        },
+        {
+          "action": "notify_am_and_eng_lead",
+          "confidence": 0.2291,
+          "source": "skill"
+        },
+        {
+          "action": "approve",
+          "confidence": 0.2205,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "CS-02",
+      "expected_action": "initiate_enterprise_onboarding",
+      "actual_action": "initiate_enterprise_onboarding",
+      "is_ambiguous": false,
+      "pass": true,
+      "entropy": 0.9472,
+      "resolution_source": "skill",
+      "primary_confidence": 0.4639,
+      "all_admissible": [
+        {
+          "action": "initiate_enterprise_onboarding",
+          "confidence": 0.4639,
+          "source": "skill"
+        },
+        {
+          "action": "page_on_call",
+          "confidence": 0.2204,
+          "source": "skill"
+        },
+        {
+          "action": "schedule_am_call",
+          "confidence": 0.2127,
+          "source": "skill"
+        },
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.1954,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "CS-03",
+      "expected_action": "monitor",
+      "actual_action": "initiate_enterprise_onboarding",
+      "is_ambiguous": false,
+      "pass": false,
+      "entropy": 0.9897,
+      "resolution_source": "skill",
+      "primary_confidence": 0.228,
+      "all_admissible": [
+        {
+          "action": "initiate_enterprise_onboarding",
+          "confidence": 0.228,
+          "source": "skill"
+        },
+        {
+          "action": "schedule_am_call",
+          "confidence": 0.1777,
+          "source": "skill"
+        },
+        {
+          "action": "send_incident_template",
+          "confidence": 0.1535,
+          "source": "skill"
+        },
+        {
+          "action": "notify_am_and_eng_lead",
+          "confidence": 0.1523,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "ENG-01",
+      "expected_action": "page_on_call",
+      "actual_action": "ambiguous",
+      "is_ambiguous": true,
+      "pass": false,
+      "entropy": 0.9892,
+      "resolution_source": "skill",
+      "primary_confidence": null,
+      "all_admissible": [
+        {
+          "action": "page_on_call",
+          "confidence": 0.3355,
+          "source": "skill"
+        },
+        {
+          "action": "send_incident_template",
+          "confidence": 0.3226,
+          "source": "skill"
+        },
+        {
+          "action": "initiate_enterprise_onboarding",
+          "confidence": 0.2548,
+          "source": "skill"
+        },
+        {
+          "action": "schedule_am_call",
+          "confidence": 0.2177,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "ENG-02",
+      "expected_action": "notify_am_and_eng_lead",
+      "actual_action": "notify_am_and_eng_lead",
+      "is_ambiguous": false,
+      "pass": true,
+      "entropy": 0.9956,
+      "resolution_source": "skill",
+      "primary_confidence": 0.3245,
+      "all_admissible": [
+        {
+          "action": "notify_am_and_eng_lead",
+          "confidence": 0.3245,
+          "source": "skill"
+        },
+        {
+          "action": "initiate_enterprise_onboarding",
+          "confidence": 0.2596,
+          "source": "skill"
+        },
+        {
+          "action": "schedule_am_call",
+          "confidence": 0.2571,
+          "source": "skill"
+        },
+        {
+          "action": "page_on_call",
+          "confidence": 0.2475,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "ENG-03",
+      "expected_action": "send_incident_template",
+      "actual_action": "send_incident_template",
+      "is_ambiguous": false,
+      "pass": true,
+      "entropy": 0.9626,
+      "resolution_source": "skill",
+      "primary_confidence": 0.5042,
+      "all_admissible": [
+        {
+          "action": "send_incident_template",
+          "confidence": 0.5042,
+          "source": "skill"
+        },
+        {
+          "action": "page_on_call",
+          "confidence": 0.3136,
+          "source": "skill"
+        },
+        {
+          "action": "notify_am_and_eng_lead",
+          "confidence": 0.2581,
+          "source": "skill"
+        },
+        {
+          "action": "resolve_within_4_hours",
+          "confidence": 0.2243,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "ENG-04",
+      "expected_action": "resolve_within_4_hours",
+      "actual_action": "resolve_within_4_hours",
+      "is_ambiguous": false,
+      "pass": true,
+      "entropy": 0.9492,
+      "resolution_source": "skill",
+      "primary_confidence": 0.4385,
+      "all_admissible": [
+        {
+          "action": "resolve_within_4_hours",
+          "confidence": 0.4385,
+          "source": "skill"
+        },
+        {
+          "action": "page_on_call",
+          "confidence": 0.266,
+          "source": "skill"
+        },
+        {
+          "action": "notify_am_and_eng_lead",
+          "confidence": 0.2564,
+          "source": "skill"
+        },
+        {
+          "action": "send_incident_template",
+          "confidence": 0.1467,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "HR-01",
+      "expected_action": "get_founder_approval",
+      "actual_action": "get_founder_approval",
+      "is_ambiguous": false,
+      "pass": true,
+      "entropy": 0.9686,
+      "resolution_source": "skill",
+      "primary_confidence": 0.3509,
+      "all_admissible": [
+        {
+          "action": "get_founder_approval",
+          "confidence": 0.3509,
+          "source": "skill"
+        },
+        {
+          "action": "notify_am_and_eng_lead",
+          "confidence": 0.2089,
+          "source": "skill"
+        },
+        {
+          "action": "page_on_call",
+          "confidence": 0.192,
+          "source": "skill"
+        },
+        {
+          "action": "initiate_pip",
+          "confidence": 0.1703,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "HR-02",
+      "expected_action": "initiate_pip",
+      "actual_action": "initiate_pip",
+      "is_ambiguous": false,
+      "pass": true,
+      "entropy": 0.9355,
+      "resolution_source": "skill",
+      "primary_confidence": 0.3314,
+      "all_admissible": [
+        {
+          "action": "initiate_pip",
+          "confidence": 0.3314,
+          "source": "skill"
+        },
+        {
+          "action": "get_founder_approval",
+          "confidence": 0.1536,
+          "source": "skill"
+        },
+        {
+          "action": "notify_am_and_eng_lead",
+          "confidence": 0.1321,
+          "source": "skill"
+        },
+        {
+          "action": "schedule_am_call",
+          "confidence": 0.1307,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "PRICE-01",
+      "expected_action": "approve",
+      "actual_action": "approve",
+      "is_ambiguous": false,
+      "pass": true,
+      "entropy": 0.9783,
+      "resolution_source": "skill",
+      "primary_confidence": 0.3852,
+      "all_admissible": [
+        {
+          "action": "approve",
+          "confidence": 0.3852,
+          "source": "skill"
+        },
+        {
+          "action": "schedule_am_call",
+          "confidence": 0.253,
+          "source": "skill"
+        },
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.2412,
+          "source": "skill"
+        },
+        {
+          "action": "initiate_enterprise_onboarding",
+          "confidence": 0.2043,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "PRICE-02",
+      "expected_action": "escalate",
+      "actual_action": "ambiguous",
+      "is_ambiguous": true,
+      "pass": false,
+      "entropy": 0.9869,
+      "resolution_source": "skill",
+      "primary_confidence": null,
+      "all_admissible": [
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.2603,
+          "source": "skill"
+        },
+        {
+          "action": "approve",
+          "confidence": 0.2428,
+          "source": "skill"
+        },
+        {
+          "action": "deny",
+          "confidence": 0.1733,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "PRICE-03",
+      "expected_action": "approve_20_percent_startup_discount",
+      "actual_action": "ambiguous",
+      "is_ambiguous": true,
+      "pass": false,
+      "entropy": 0.9549,
+      "resolution_source": "skill",
+      "primary_confidence": null,
+      "all_admissible": [
+        {
+          "action": "approve",
+          "confidence": 0.3004,
+          "source": "skill"
+        },
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.2983,
+          "source": "skill"
+        },
+        {
+          "action": "get_founder_approval",
+          "confidence": 0.1421,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "SLACK-01",
+      "expected_action": "approve",
+      "actual_action": "ambiguous",
+      "is_ambiguous": true,
+      "pass": false,
+      "entropy": 0.9788,
+      "resolution_source": "skill",
+      "primary_confidence": null,
+      "all_admissible": [
+        {
+          "action": "approve",
+          "confidence": 0.2957,
+          "source": "skill"
+        },
+        {
+          "action": "deny",
+          "confidence": 0.2914,
+          "source": "skill"
+        },
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.2165,
+          "source": "skill"
+        },
+        {
+          "action": "schedule_am_call",
+          "confidence": 0.158,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "OPS-01",
+      "expected_action": "route_to_ops_lead",
+      "actual_action": "route_to_ops_lead",
+      "is_ambiguous": false,
+      "pass": true,
+      "entropy": 0.8779,
+      "resolution_source": "skill",
+      "primary_confidence": 0.4786,
+      "all_admissible": [
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.4786,
+          "source": "skill"
+        },
+        {
+          "action": "approve",
+          "confidence": 0.1557,
+          "source": "skill"
+        },
+        {
+          "action": "page_on_call",
+          "confidence": 0.1444,
+          "source": "skill"
+        },
+        {
+          "action": "get_founder_approval",
+          "confidence": 0.1386,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "ENG-ADV-01",
+      "expected_action": "resolve_within_4_hours",
+      "actual_action": "resolve_within_4_hours",
+      "is_ambiguous": false,
+      "pass": true,
+      "entropy": 0.9875,
+      "resolution_source": "skill",
+      "primary_confidence": 0.3531,
+      "all_admissible": [
+        {
+          "action": "resolve_within_4_hours",
+          "confidence": 0.3531,
+          "source": "skill"
+        },
+        {
+          "action": "page_on_call",
+          "confidence": 0.2622,
+          "source": "skill"
+        },
+        {
+          "action": "notify_am_and_eng_lead",
+          "confidence": 0.2471,
+          "source": "skill"
+        },
+        {
+          "action": "send_incident_template",
+          "confidence": 0.2153,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "REF-ADV-01",
+      "expected_action": "escalate",
+      "actual_action": "route_to_ops_lead",
+      "is_ambiguous": false,
+      "pass": false,
+      "entropy": 0.9751,
+      "resolution_source": "skill",
+      "primary_confidence": 0.2986,
+      "all_admissible": [
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.2986,
+          "source": "skill"
+        },
+        {
+          "action": "initiate_enterprise_onboarding",
+          "confidence": 0.2479,
+          "source": "skill"
+        },
+        {
+          "action": "approve",
+          "confidence": 0.2419,
+          "source": "skill"
+        },
+        {
+          "action": "deny",
+          "confidence": 0.1378,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "HR-ADV-01",
+      "expected_action": "get_founder_approval",
+      "actual_action": "get_founder_approval",
+      "is_ambiguous": false,
+      "pass": true,
+      "entropy": 0.9625,
+      "resolution_source": "skill",
+      "primary_confidence": 0.3077,
+      "all_admissible": [
+        {
+          "action": "get_founder_approval",
+          "confidence": 0.3077,
+          "source": "skill"
+        },
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.1699,
+          "source": "skill"
+        },
+        {
+          "action": "initiate_pip",
+          "confidence": 0.1665,
+          "source": "skill"
+        },
+        {
+          "action": "initiate_enterprise_onboarding",
+          "confidence": 0.1383,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "CS-ADV-01",
+      "expected_action": "monitor",
+      "actual_action": "initiate_enterprise_onboarding",
+      "is_ambiguous": false,
+      "pass": false,
+      "entropy": 0.9934,
+      "resolution_source": "skill",
+      "primary_confidence": 0.2533,
+      "all_admissible": [
+        {
+          "action": "initiate_enterprise_onboarding",
+          "confidence": 0.2533,
+          "source": "skill"
+        },
+        {
+          "action": "schedule_am_call",
+          "confidence": 0.1921,
+          "source": "skill"
+        },
+        {
+          "action": "deny",
+          "confidence": 0.1874,
+          "source": "skill"
+        },
+        {
+          "action": "notify_am_and_eng_lead",
+          "confidence": 0.1852,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "PRICE-ADV-01",
+      "expected_action": "escalate",
+      "actual_action": "route_to_ops_lead",
+      "is_ambiguous": false,
+      "pass": false,
+      "entropy": 0.9614,
+      "resolution_source": "skill",
+      "primary_confidence": 0.2879,
+      "all_admissible": [
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.2879,
+          "source": "skill"
+        },
+        {
+          "action": "approve",
+          "confidence": 0.1946,
+          "source": "skill"
+        },
+        {
+          "action": "deny",
+          "confidence": 0.1407,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "DET-01",
+      "expected_action": "ambiguous",
+      "actual_action": "ambiguous",
+      "is_ambiguous": true,
+      "pass": true,
+      "entropy": 0.9689,
+      "resolution_source": "skill",
+      "primary_confidence": null,
+      "all_admissible": [
+        {
+          "action": "resolve_within_4_hours",
+          "confidence": 0.4982,
+          "source": "skill"
+        },
+        {
+          "action": "page_on_call",
+          "confidence": 0.3862,
+          "source": "skill"
+        },
+        {
+          "action": "notify_am_and_eng_lead",
+          "confidence": 0.357,
+          "source": "skill"
+        },
+        {
+          "action": "send_incident_template",
+          "confidence": 0.208,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "DET-02",
+      "expected_action": "ambiguous",
+      "actual_action": "ambiguous",
+      "is_ambiguous": true,
+      "pass": true,
+      "entropy": 0.9624,
+      "resolution_source": "skill",
+      "primary_confidence": null,
+      "all_admissible": [
+        {
+          "action": "get_founder_approval",
+          "confidence": 0.3028,
+          "source": "skill"
+        },
+        {
+          "action": "approve",
+          "confidence": 0.1654,
+          "source": "skill"
+        },
+        {
+          "action": "initiate_pip",
+          "confidence": 0.1564,
+          "source": "skill"
+        },
+        {
+          "action": "initiate_enterprise_onboarding",
+          "confidence": 0.1414,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "DET-03",
+      "expected_action": "ambiguous",
+      "actual_action": "ambiguous",
+      "is_ambiguous": true,
+      "pass": true,
+      "entropy": 0.9881,
+      "resolution_source": "skill",
+      "primary_confidence": null,
+      "all_admissible": [
+        {
+          "action": "page_on_call",
+          "confidence": 0.1775,
+          "source": "skill"
+        },
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.1504,
+          "source": "skill"
+        },
+        {
+          "action": "notify_am_and_eng_lead",
+          "confidence": 0.1176,
+          "source": "skill"
+        },
+        {
+          "action": "approve",
+          "confidence": 0.1152,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "DET-04",
+      "expected_action": "ambiguous",
+      "actual_action": "ambiguous",
+      "is_ambiguous": true,
+      "pass": true,
+      "entropy": 0.9673,
+      "resolution_source": "skill",
+      "primary_confidence": null,
+      "all_admissible": [
+        {
+          "action": "schedule_am_call",
+          "confidence": 0.3273,
+          "source": "skill"
+        },
+        {
+          "action": "initiate_enterprise_onboarding",
+          "confidence": 0.2595,
+          "source": "skill"
+        },
+        {
+          "action": "deny",
+          "confidence": 0.2418,
+          "source": "skill"
+        },
+        {
+          "action": "approve",
+          "confidence": 0.1328,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "DET-05",
+      "expected_action": "ambiguous",
+      "actual_action": "ambiguous",
+      "is_ambiguous": true,
+      "pass": true,
+      "entropy": 0.9695,
+      "resolution_source": "skill",
+      "primary_confidence": null,
+      "all_admissible": [
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.2694,
+          "source": "skill"
+        },
+        {
+          "action": "approve",
+          "confidence": 0.2278,
+          "source": "skill"
+        },
+        {
+          "action": "deny",
+          "confidence": 0.1694,
+          "source": "skill"
+        },
+        {
+          "action": "schedule_am_call",
+          "confidence": 0.1209,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "DET-06",
+      "expected_action": "ambiguous",
+      "actual_action": "ambiguous",
+      "is_ambiguous": true,
+      "pass": true,
+      "entropy": 0.9947,
+      "resolution_source": "skill",
+      "primary_confidence": null,
+      "all_admissible": [
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.2654,
+          "source": "skill"
+        },
+        {
+          "action": "initiate_enterprise_onboarding",
+          "confidence": 0.2441,
+          "source": "skill"
+        },
+        {
+          "action": "page_on_call",
+          "confidence": 0.2263,
+          "source": "skill"
+        },
+        {
+          "action": "schedule_am_call",
+          "confidence": 0.1895,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "COND-01",
+      "expected_action": "approve",
+      "actual_action": "approve",
+      "is_ambiguous": false,
+      "pass": true,
+      "entropy": 0.9513,
+      "resolution_source": "skill",
+      "primary_confidence": 0.3694,
+      "all_admissible": [
+        {
+          "action": "approve",
+          "confidence": 0.3694,
+          "source": "skill"
+        },
+        {
+          "action": "schedule_am_call",
+          "confidence": 0.1796,
+          "source": "skill"
+        },
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.178,
+          "source": "skill"
+        },
+        {
+          "action": "deny",
+          "confidence": 0.1584,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "COND-02",
+      "expected_action": "approve_prorated",
+      "actual_action": "approve",
+      "is_ambiguous": false,
+      "pass": false,
+      "entropy": 0.9782,
+      "resolution_source": "skill",
+      "primary_confidence": 0.2897,
+      "all_admissible": [
+        {
+          "action": "approve",
+          "confidence": 0.2897,
+          "source": "skill"
+        },
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.1904,
+          "source": "skill"
+        },
+        {
+          "action": "schedule_am_call",
+          "confidence": 0.1782,
+          "source": "skill"
+        },
+        {
+          "action": "deny",
+          "confidence": 0.1545,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "COND-03",
+      "expected_action": "approve",
+      "actual_action": "ambiguous",
+      "is_ambiguous": true,
+      "pass": false,
+      "entropy": 0.978,
+      "resolution_source": "skill",
+      "primary_confidence": null,
+      "all_admissible": [
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.2411,
+          "source": "skill"
+        },
+        {
+          "action": "approve",
+          "confidence": 0.2258,
+          "source": "skill"
+        },
+        {
+          "action": "deny",
+          "confidence": 0.2213,
+          "source": "skill"
+        },
+        {
+          "action": "page_on_call",
+          "confidence": 0.1212,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "COND-04",
+      "expected_action": "get_founder_approval",
+      "actual_action": "approve",
+      "is_ambiguous": false,
+      "pass": false,
+      "entropy": 0.9915,
+      "resolution_source": "skill",
+      "primary_confidence": 0.2886,
+      "all_admissible": [
+        {
+          "action": "approve",
+          "confidence": 0.2886,
+          "source": "skill"
+        },
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.2403,
+          "source": "skill"
+        },
+        {
+          "action": "deny",
+          "confidence": 0.2066,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "COND-05",
+      "expected_action": "ambiguous",
+      "actual_action": "ambiguous",
+      "is_ambiguous": true,
+      "pass": true,
+      "entropy": 0.9879,
+      "resolution_source": "skill",
+      "primary_confidence": null,
+      "all_admissible": [
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.2376,
+          "source": "skill"
+        },
+        {
+          "action": "approve",
+          "confidence": 0.2141,
+          "source": "skill"
+        },
+        {
+          "action": "deny",
+          "confidence": 0.1594,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "COND-06",
+      "expected_action": "deny",
+      "actual_action": "deny",
+      "is_ambiguous": false,
+      "pass": true,
+      "entropy": 0.97,
+      "resolution_source": "skill",
+      "primary_confidence": 0.3496,
+      "all_admissible": [
+        {
+          "action": "deny",
+          "confidence": 0.3496,
+          "source": "skill"
+        },
+        {
+          "action": "approve",
+          "confidence": 0.2915,
+          "source": "skill"
+        },
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.1915,
+          "source": "skill"
+        },
+        {
+          "action": "schedule_am_call",
+          "confidence": 0.1725,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "COND-07",
+      "expected_action": "deny",
+      "actual_action": "deny",
+      "is_ambiguous": false,
+      "pass": true,
+      "entropy": 0.9681,
+      "resolution_source": "skill",
+      "primary_confidence": 0.2578,
+      "all_admissible": [
+        {
+          "action": "deny",
+          "confidence": 0.2578,
+          "source": "skill"
+        },
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.218,
+          "source": "skill"
+        },
+        {
+          "action": "approve",
+          "confidence": 0.1325,
+          "source": "skill"
+        }
+      ]
+    },
+    {
+      "id": "COND-08",
+      "expected_action": "schedule_am_call",
+      "actual_action": "schedule_am_call",
+      "is_ambiguous": false,
+      "pass": true,
+      "entropy": 0.9837,
+      "resolution_source": "skill",
+      "primary_confidence": 0.4443,
+      "all_admissible": [
+        {
+          "action": "schedule_am_call",
+          "confidence": 0.4443,
+          "source": "skill"
+        },
+        {
+          "action": "initiate_enterprise_onboarding",
+          "confidence": 0.3831,
+          "source": "skill"
+        },
+        {
+          "action": "route_to_ops_lead",
+          "confidence": 0.2848,
+          "source": "skill"
+        },
+        {
+          "action": "page_on_call",
+          "confidence": 0.2641,
+          "source": "skill"
+        }
+      ]
+    }
+  ]
+}

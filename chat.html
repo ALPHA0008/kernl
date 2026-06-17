@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chat with Gemma 4 12B</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; background: #f5f5f5; }
+    h1 { font-size: 1.3rem; margin-bottom: 16px; color: #333; }
+    #chat { background: #fff; border-radius: 10px; padding: 16px; height: 60vh; overflow-y: auto; border: 1px solid #ddd; margin-bottom: 12px; }
+    .msg { margin-bottom: 12px; }
+    .msg b { display: block; font-size: 0.8rem; color: #666; margin-bottom: 2px; }
+    .msg p { background: #f0f0f0; border-radius: 8px; padding: 8px 12px; display: inline-block; max-width: 90%; white-space: pre-wrap; }
+    .msg.you p { background: #007aff; color: #fff; }
+    .msg.you { text-align: right; }
+    #form { display: flex; gap: 8px; }
+    #input { flex: 1; padding: 10px 14px; border-radius: 8px; border: 1px solid #ddd; font-size: 0.95rem; }
+    #input:focus { outline: none; border-color: #007aff; }
+    button { padding: 10px 20px; border-radius: 8px; border: none; background: #007aff; color: #fff; font-size: 0.95rem; cursor: pointer; }
+    button:disabled { opacity: 0.5; }
+    .loading { color: #999; font-style: italic; text-align: center; padding: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Gemma 4 12B (Ollama)</h1>
+  <div id="chat"></div>
+  <div id="form">
+    <input id="input" placeholder="Type a message..." autofocus />
+    <button id="send">Send</button>
+  </div>
+  <script>
+    const chat = document.getElementById('chat');
+    const input = document.getElementById('input');
+    const send = document.getElementById('send');
+
+    function addMsg(role, text) {
+      const div = document.createElement('div');
+      div.className = 'msg ' + role;
+      div.innerHTML = `<b>${role === 'you' ? 'You' : 'Gemma'}</b><p>${text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+      return div.querySelector('p');
+    }
+
+    async function sendMsg() {
+      const text = input.value.trim();
+      if (!text) return;
+      addMsg('you', text);
+      input.value = '';
+      send.disabled = true;
+
+      const status = document.createElement('div');
+      status.className = 'loading';
+      status.textContent = 'Thinking...';
+      chat.appendChild(status);
+      chat.scrollTop = chat.scrollHeight;
+
+      const msgDiv = document.createElement('div');
+      msgDiv.className = 'msg assistant';
+      msgDiv.innerHTML = '<b>Gemma</b><p></p>';
+      const p = msgDiv.querySelector('p');
+
+      try {
+        const res = await fetch('http://localhost:11434/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: 'gemma4:12b', messages: [{ role: 'user', content: text }], stream: true })
+        });
+        status.remove();
+        chat.appendChild(msgDiv);
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const chunk = JSON.parse(line);
+              p.textContent += chunk.message?.content || '';
+              chat.scrollTop = chat.scrollHeight;
+            } catch {}
+          }
+        }
+      } catch (e) {
+        status.remove();
+        addMsg('assistant', 'Error: ' + e.message);
+      }
+      send.disabled = false;
+    }
+
+    send.onclick = sendMsg;
+    input.onkeydown = e => { if (e.key === 'Enter') sendMsg(); };
+  </script>
+</body>
+</html>

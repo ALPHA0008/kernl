@@ -17,14 +17,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy backend codebase
 COPY backend/ ./backend/
 
+# Copy source data files so the pipeline can find them at runtime
+COPY data/ ./data/
+
 # Create data directories and set permissions so Hugging Face user can write to them
-RUN mkdir -p /app/backend/data/sources && chmod -R 777 /app/backend/data
+RUN mkdir -p /app/data/sources && chmod -R 777 /app/data
 
 # Set PYTHONPATH so Python can locate our backend module
 ENV PYTHONPATH=/app
 
-# Expose Hugging Face Spaces default port
-EXPOSE 7860
+EXPOSE 8081
 
-# Run uvicorn on port 7860
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["uvicorn", "backend.api:app", "--host", "0.0.0.0", "--port", "8081"]
