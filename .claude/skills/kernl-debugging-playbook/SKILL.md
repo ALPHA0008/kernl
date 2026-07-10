@@ -166,7 +166,7 @@ One paragraph each; the full chronicle of every incident lives in `kernl-failure
 
 **The eval that can't crash.** `--stability` mode passes wrong kwargs, but its blanket `except Exception` converts the `TypeError` into `action_type: "error"` for every run — three identical "error" strings count as "consistent", so it reports a perfect stability score while testing nothing (§2f). Lesson: in this codebase, broad exception handlers routinely convert crashes into plausible-looking output (`safe_llm_json_call`, `_baseline`'s `_parse`, the eval loops). When a number looks fine but the world doesn't, suspect a swallowed exception first.
 
-## 4. Provenance and maintenance
+## Provenance and maintenance
 
 Facts verified against the working tree on **2026-07-08**. Re-verify volatile facts before trusting them (all commands from repo root, Git Bash; quote the repo path):
 
