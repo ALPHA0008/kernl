@@ -8,3 +8,4 @@ supabase
 python-dotenv
 python-multipart
 pydantic
+psycopg[binary]>=3.2

@@ -1,0 +1,158 @@
+"""V1 service container: wires stores + services and owns the seed bootstrap.
+
+The in-memory stores are the tested reference implementations of the storage
+protocols (see backend/tests/*). Production persistence swaps Supabase-backed
+implementations of the same protocols into this container -- an infrastructure
+change that touches no API or service code (tables: backend/schema.sql).
+
+Seed bootstrap (KERNL_SEED_RIVANLY=1): registers the authored rivanly-inc
+reference bundle [synthetic] and its golden cases, then walks it through the
+REAL publish gate -- draft -> replay vs golden set -> acknowledge -> publish.
+No backdoor: if the seed ever fails its own golden set, the process refuses
+to serve it.
+"""
+
+from __future__ import annotations
+
+import os
+import threading
+from typing import Optional
+
+from backend.bundle.lifecycle import BundleLifecycle, BundleStore, InMemoryBundleStore
+from backend.escalation.service import (
+    Escalation,
+    EscalationService,
+    EscalationStore,
+    InMemoryEscalationStore,
+    Resolution,
+)
+from backend.ledger.events import DecisionEvent
+from backend.ledger.service import DecisionService
+from backend.ledger.store import InMemoryLedgerStore, LedgerStore
+from backend.replay.cases import CaseStore, Expected, GoldenCase, InMemoryCaseStore
+from backend.replay.engine import InMemoryReplayRunStore, ReplayEngine, ReplayRunStore
+
+SEED_ENV = "KERNL_SEED_RIVANLY"
+
+
+class Container:
+    def __init__(
+        self,
+        ledger: Optional[LedgerStore] = None,
+        bundles: Optional[BundleStore] = None,
+        escalation_store: Optional[EscalationStore] = None,
+        cases: Optional[CaseStore] = None,
+        replay_runs: Optional[ReplayRunStore] = None,
+    ) -> None:
+        self.ledger: LedgerStore = ledger or InMemoryLedgerStore()
+        self.bundles: BundleStore = bundles or InMemoryBundleStore()
+        self.escalation_store: EscalationStore = escalation_store or InMemoryEscalationStore()
+        self.cases: CaseStore = cases or InMemoryCaseStore()
+        self.replay_runs: ReplayRunStore = replay_runs or InMemoryReplayRunStore()
+
+        self.decisions = DecisionService(self.ledger)
+        self.replay = ReplayEngine(self.replay_runs)
+        self.lifecycle = BundleLifecycle(self.bundles, self.replay_runs)
+        self.escalations = EscalationService(
+            self.escalation_store, self.decisions, self._promote_golden
+        )
+
+    # promoted adjudications become golden cases with full provenance
+    def _promote_golden(self, event: DecisionEvent, resolution: Resolution) -> None:
+        self.cases.add(
+            GoldenCase(
+                case_id=f"adj-{event.event_id[:8]}",
+                company_id=event.company_id,
+                workflow=event.workflow,
+                facts=event.facts,
+                expected=Expected(
+                    kind=resolution.outcome_kind, action=resolution.chosen_action
+                ),
+                provenance=f"adjudication:{resolution.adjudication_event_id}",
+                synthetic=False,
+            )
+        )
+
+    def escalations_by_decision(self, company_id: str, decision_event_id: str) -> Optional[Escalation]:
+        return self.escalation_store.by_decision(company_id, decision_event_id)
+
+    def seed_rivanly(self) -> None:
+        """Idempotent: registers + publishes the reference bundle through the
+        real replay gate. Raises if the seed fails its own golden set."""
+        from backend.bundle.seed_rivanly import COMPANY_ID, build_bundle, build_golden_cases
+
+        if self.lifecycle.active_bundle(COMPANY_ID) is not None:
+            return
+        bundle = build_bundle()
+        for case in build_golden_cases():
+            try:
+                self.cases.add(case)
+            except ValueError:
+                pass  # already seeded
+        draft = self.lifecycle.save_draft(COMPANY_ID, bundle, created_by="seed")
+        run = self.replay.run(
+            company_id=COMPANY_ID, cases=self.cases.list(COMPANY_ID), candidate=bundle
+        )
+        if run.summary.golden_failed or run.summary.errors:
+            raise RuntimeError(
+                f"seed bundle fails its own golden set "
+                f"({run.summary.golden_failed} failed, {run.summary.errors} errors) "
+                "-- refusing to publish"
+            )
+        self.replay.acknowledge(COMPANY_ID, run.run_id, by="seed")
+        self.lifecycle.publish(COMPANY_ID, draft.record_id, published_by="seed")
+
+
+_container: Optional[Container] = None
+_lock = threading.Lock()
+
+
+def _build_container() -> Container:
+    """Store selection is env-driven:
+    KERNL_DB_URL set   -> Postgres adapters (production persistence)
+    KERNL_DB_URL unset -> in-memory reference stores (dev/tests; volatile)
+    """
+    from pathlib import Path
+
+    from dotenv import load_dotenv
+
+    # explicit repo-root .env (backend/.env would shadow it in the walk-up)
+    load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+    db_url = os.environ.get("KERNL_DB_URL") or os.environ.get("SUPABASE_DB_URL")
+    if db_url:
+        from backend.stores_pg import (
+            PgBundleStore,
+            PgCaseStore,
+            PgEscalationStore,
+            PgLedgerStore,
+            PgReplayRunStore,
+        )
+
+        schema = os.environ.get("KERNL_DB_SCHEMA", "public")
+        return Container(
+            ledger=PgLedgerStore(db_url, schema=schema),
+            bundles=PgBundleStore(db_url, schema=schema),
+            escalation_store=PgEscalationStore(db_url, schema=schema),
+            cases=PgCaseStore(db_url, schema=schema),
+            replay_runs=PgReplayRunStore(db_url, schema=schema),
+        )
+    return Container()
+
+
+def get_container() -> Container:
+    global _container
+    if _container is None:
+        with _lock:
+            if _container is None:
+                c = _build_container()
+                if os.environ.get(SEED_ENV, "1") == "1":
+                    c.seed_rivanly()
+                _container = c
+    return _container
+
+
+def reset_container() -> None:
+    """Test hook: drop the singleton so the next request rebuilds it."""
+    global _container
+    with _lock:
+        _container = None

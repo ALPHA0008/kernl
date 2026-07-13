@@ -21,6 +21,22 @@ from backend.runtime.constraint_resolver import (
 AMBIGUITY_ENTROPY_THRESHOLD = DEFAULT_THRESHOLDS["ambiguity_entropy"]
 from backend.runtime.guardrails import guardrail_check
 
+import backend.runtime.constraint_resolver as _cr
+
+# The production default is GRAPH_AUTHORITY_ENABLED = False (W1: graph is not
+# decision authority). These unit tests exercise the graph-resolution
+# MECHANISM, so they enable it explicitly. test_graph_authority_default_off
+# guards the production default.
+_PRODUCTION_GRAPH_DEFAULT = _cr.GRAPH_AUTHORITY_ENABLED
+_cr.GRAPH_AUTHORITY_ENABLED = True
+
+
+def test_graph_authority_default_off():
+    assert _PRODUCTION_GRAPH_DEFAULT is False, (
+        "W1: the graph decision path must ship disabled; enabling it requires "
+        "an evidence-citing decision record"
+    )
+
 
 def _make_graph_policy(
     policy_id: str,
@@ -542,6 +558,7 @@ def test_constraint_result_ambiguous_to_dict():
 
 if __name__ == "__main__":
     tests = [
+        ("graph_authority_default_off", test_graph_authority_default_off),
         ("entropy_empty_list", test_entropy_empty_list),
         ("entropy_single_action", test_entropy_single_action),
         ("entropy_two_equal", test_entropy_two_equal),

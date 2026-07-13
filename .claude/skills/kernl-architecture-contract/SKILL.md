@@ -17,7 +17,7 @@ description: Load this before changing kernl's pipeline graph, runtime retrieval
 
 ## 1. The mental model (read this first)
 
-kernl compiles company documents (SOPs, Slack exports, tickets) into a versioned "brain" — a JSON artifact of executable skills plus an operational graph — and then answers operational questions from the compiled brain, never from raw documents. The architecture is four additive layers (docs/operational-graph-master-plan.md:23-34):
+kernl compiles company documents (SOPs, Slack exports, tickets) into a versioned "brain" — a JSON artifact of executable skills plus an operational graph — and then answers operational questions from the compiled brain, never from raw documents. The architecture is four additive layers (docs/archive/operational-graph-master-plan.md [doc removed 2026-07-13; historical citation]:23-34):
 
 ```
 LLM verbalizer        <- surface layer: explains decisions in natural language
@@ -30,9 +30,9 @@ Three principles are load-bearing. Violating any of them is an architecture chan
 
 | Principle | Meaning | Enforced where |
 |---|---|---|
-| Each layer is additive | New layers handle what the previous couldn't, and fall back downward. Nothing gets deleted when a layer is added. | docs/operational-graph-master-plan.md:34 |
+| Each layer is additive | New layers handle what the previous couldn't, and fall back downward. Nothing gets deleted when a layer is added. | docs/archive/operational-graph-master-plan.md [doc removed 2026-07-13; historical citation]:34 |
 | LLM explains, never decides | The constraint resolver picks the action deterministically; the LLM only verbalizes it; a guardrail overrides the LLM if it diverges. | backend/runtime/constraint_resolver.py:11-13, backend/runtime/guardrails.py:14 |
-| The system must know when it doesn't know | Ambiguity is a first-class output: entropy over admissible actions above a threshold → `action_type="ambiguous"`, escalate to a human. | docs/operational-graph-master-plan.md:906, backend/runtime/constraint_resolver.py:262, :493-494 |
+| The system must know when it doesn't know | Ambiguity is a first-class output: entropy over admissible actions above a threshold → `action_type="ambiguous"`, escalate to a human. | docs/archive/operational-graph-master-plan.md [doc removed 2026-07-13; historical citation]:906, backend/runtime/constraint_resolver.py:262, :493-494 |
 
 "Deterministic" here means: `graph_retriever.py`, `constraint_resolver.py`, `precedence.py`, `condition_eval.py`, and `guardrails.py` contain **zero LLM calls**. Keep it that way.
 

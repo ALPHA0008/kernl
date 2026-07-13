@@ -1,7 +1,7 @@
 """
 eval_harness.py
 ───────────────
-21-scenario + 5 adversarial ground-truth eval against the CURRENT Kernl runtime engine.
+40-scenario (incl. adversarial, determinism, boundary) ground-truth eval against the CURRENT Kernl runtime engine.
 
 Usage (from repo root):
     python -m backend.tests.eval_harness           # standard run
@@ -621,8 +621,8 @@ async def run_eval(scenarios=None, label="STANDARD", retrieval_weights=None) -> 
 
         try:
             response = await handle_agent_query(
-                cid=COMPANY_ID,
-                scenario=s["scenario"],
+                COMPANY_ID,
+                s["scenario"],
                 ctx=s["context"],
                 with_brain=True,
                 rw=retrieval_weights,
@@ -751,7 +751,7 @@ async def run_eval(scenarios=None, label="STANDARD", retrieval_weights=None) -> 
     # Condition metrics
     det_scenarios = [r for r in results if r["id"].startswith("DET-")]
     cond_scenarios = [r for r in results if r["id"].startswith("COND-")]
-    adv_scenarios = [r for r in results if r["id"].startswith("ADV-")]
+    adv_scenarios = [r for r in results if "-ADV-" in r["id"]]
 
     det_count = len(det_scenarios)
     cond_count = len(cond_scenarios)
@@ -968,9 +968,9 @@ async def run_stability_test() -> None:
         for run in range(3):
             try:
                 response = await handle_agent_query(
-                    company_id=COMPANY_ID,
-                    scenario=s["scenario"],
-                    context=s["context"],
+                    COMPANY_ID,
+                    s["scenario"],
+                    ctx=s["context"],
                     with_brain=True,
                 )
             except Exception as e:
@@ -1000,7 +1000,8 @@ async def _main():
         await run_ablation()
     else:
         result = await run_eval()
-        out_path = os.path.join(os.path.dirname(__file__), "eval_results_baseline.json")
+        from datetime import datetime as _dt
+        out_path = os.path.join(os.path.dirname(__file__), f"eval_results_{_dt.now():%Y-%m-%d}.json")  # golden baseline is frozen; never overwrite in place
         with open(out_path, "w") as f:
             json.dump(result, f, indent=2)
         print(f"  Results saved -> {out_path}", flush=True)

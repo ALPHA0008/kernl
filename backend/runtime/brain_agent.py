@@ -1,4 +1,4 @@
-import json, os, re, math, numpy as np
+import json, re, math, numpy as np
 from backend.core.db.supabase import get_client
 from backend.core.llm import llm_call, get_embedding
 from backend.runtime.graph_retriever import retrieve_from_graph
@@ -599,11 +599,6 @@ def _admissible(top_r, qs, meta=None):
     return ranked, _entropy(ranked)
 
 
-_LOCAL_BRAIN = os.path.join(
-    os.path.dirname(__file__), "..", "tests", "last_compiled_brain.json"
-)
-
-
 def _load_db(cid):
     try:
         db = get_client()
@@ -624,22 +619,19 @@ def _load_db(cid):
         return None, f"Database query failed: {e}"
 
 
-def _load_file():
-    p = os.path.abspath(_LOCAL_BRAIN)
-    if not os.path.exists(p):
-        return None, f"No local brain file found at {p}. Compile first."
-    with open(p) as f:
-        return json.load(f), None
-
-
 async def handle_agent_query(cid, scenario, ctx=None, with_brain=True, rw=None):
+    # Constitutional (CLAUDE.md rule 4): no fixture fallbacks. DB failure is an
+    # explicit, visible error -- the runtime never silently substitutes a local
+    # artifact. The with_brain=False baseline path (Brain-vs-Generic demo
+    # theater) is retired and rejected.
     if not with_brain:
-        return await _baseline(scenario, ctx)
+        return _err(
+            "The with_brain=False baseline mode is retired (see CLAUDE.md: "
+            "'never resurrect ... Brain-vs-Generic demo theater')."
+        )
     bd, err = _load_db(cid)
     if err:
-        bd, err = _load_file()
-    if err:
-        return _err(err)
+        return _err(f"unavailable: {err}")
     skills = bd.get("skills", [])
     if not skills:
         return _err("Brain is empty — no skills compiled.")
@@ -647,7 +639,12 @@ async def handle_agent_query(cid, scenario, ctx=None, with_brain=True, rw=None):
     graph = bd.get("graph_json", {})
     gf = _t(meta, "graph_fallback_threshold", 0.5)
     gr = retrieve_from_graph(scenario, ctx or {}, graph)
-    gu = gr["success"] and gr["graph_confidence"] >= gf
+    # W1 (constitutional): the operational graph is NOT decision authority --
+    # compiled graph policies are unconditional approves. Graph retrieval stays
+    # advisory (reasoning steps only); it never gates the decision path.
+    # Re-enabling requires an evidence-citing decision record.
+    gu = False
+    _ = gf  # threshold retained for the advisory trace only
     grr = gr.get("reasoning_steps", [])
     qt = f"{scenario} {json.dumps(ctx or {})}"
     qe = get_embedding(qt)
@@ -807,16 +804,6 @@ Respond with ONLY this JSON:
         result["decision_trace"]["candidate_entropy"] = round(ce, 3)
     result["constraint_result"] = cr.to_dict()
     return result
-
-
-async def _baseline(scenario, ctx=None):
-    p = """You are a generic AI assistant. You have NO company-specific knowledge or policies.
-Answer based only on general industry standards. Be honest about your lack of specific context.
-Respond with ONLY a JSON object:
-{"action_type":"ambiguous","recommended_action":"your general recommendation","rule_applied":"general industry standard you referenced","evidence":[],"skill_matched":"none","action_confidence":{"retrieval_confidence":0.0,"operational_confidence":0.0,"selection_confidence":0.0},"retrieval_scores":[],"reasoning":"explain your reasoning, noting you lack company-specific context"}"""
-    return _parse(
-        await llm_call(p, f"Scenario: {scenario}\nContext: {json.dumps(ctx or {})}")
-    )
 
 
 def _norm(raw, meta=None):

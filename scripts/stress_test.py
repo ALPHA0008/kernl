@@ -8,7 +8,7 @@ Stress test: proves compiler resilience under adversarial conditions.
 Usage:
     python scripts/stress_test.py
 
-Requires: backend running on http://localhost:8080
+Requires: backend running on http://localhost:8081
 """
 
 import requests
@@ -17,7 +17,7 @@ import sys
 import os
 import json
 
-API = "http://localhost:8080"
+API = "http://localhost:8081"
 COMPANY = "rivanly-inc"
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

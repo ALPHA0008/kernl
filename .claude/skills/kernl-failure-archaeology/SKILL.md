@@ -114,7 +114,7 @@ git -C "d:/Abhijith P/Desktop/Project/kernl" log --oneline --format='%h %ad %s' 
 
 | Rejected | Where recorded | Rationale on record | Status |
 |---|---|---|---|
-| **Neo4j** (graph DB) | `docs/operational-graph-master-plan.md:1405-1414` ("Probably never Neo4j") | Per-company graph is small (<10k nodes); schema still evolving; Neo4j adds ops overhead and cognitive load "with zero benefit at this stage". Chosen instead: in-memory dict + JSONB persistence (`graph_json JSONB` on `skills_files`); pgvector adjacency is a *maybe-later* at 100+ companies. | **settled** |
+| **Neo4j** (graph DB) | `docs/archive/operational-graph-master-plan.md [doc removed 2026-07-13; historical citation]:1405-1414` ("Probably never Neo4j") | Per-company graph is small (<10k nodes); schema still evolving; Neo4j adds ops overhead and cognitive load "with zero benefit at this stage". Chosen instead: in-memory dict + JSONB persistence (`graph_json JSONB` on `skills_files`); pgvector adjacency is a *maybe-later* at 100+ companies. | **settled** |
 | **Gemini free tier** | `gemini_test_response.txt` (repo root) | The one recorded attempt returned HTTP 429 `RESOURCE_EXHAUSTED` with free-tier quota **limit: 0** for `gemini-2.0-flash` — i.e., no usable free quota at all, not merely rate-limited. | **settled** (as a free-tier option; a paid tier was never evaluated) |
 | **Ollama/Gemma local chat** | `chat.html` + `serve_chat.py` (repo root) | Scratch experiment: `serve_chat.py` serves `chat.html` on port 8080 (`serve_chat.py:3`), which calls a local Ollama server at `http://localhost:11434/api/chat` with model `gemma4:12b` (`chat.html:63-66`). Not wired to the product; no product code imports it. | **fenced-off** — not part of the product; do not extend, do not document as a feature |
 
@@ -133,7 +133,7 @@ All three landed/were recorded in `2ca7f83` (as of 2026-07-08). Reopening any of
 - **Symptom/Trigger:** `graphiti.md` (665 lines, repo root) looks like an in-house temporal-graph design doc.
 - **Root cause:** it is a verbatim copy of the **getzep/graphiti** open-source project README, saved as prior-art reference during the operational-graph design work (`2ca7f83`). Tells: Zep hiring notice (`graphiti.md:11`), "Graphiti and Zep" section (`graphiti.md:54-58`), getzep.com links throughout.
 - **Evidence:** `git grep -n "getzep" graphiti.md` (as of 2026-07-08).
-- **Status:** **fenced-off.** It is NOT kernl's design, NOT a roadmap, and nothing in it is a commitment. kernl's actual graph design lives in `docs/operational-graph-master-plan.md` (see E7 row 1). External/marketing claims: `kernl-external-positioning`.
+- **Status:** **fenced-off.** It is NOT kernl's design, NOT a roadmap, and nothing in it is a commitment. kernl's actual graph design lives in `docs/archive/operational-graph-master-plan.md [doc removed 2026-07-13; historical citation]` (see E7 row 1). External/marketing claims: `kernl-external-positioning`.
 - **Lesson:** label prior-art imports at the top of the file — or expect exactly this confusion.
 
 ---
@@ -172,7 +172,7 @@ Facts verified 2026-07-08 against the working tree and git history at the repo r
 | Port mismatch 7860 vs 8081 (E5) | `git grep -n "7860" README.md; git grep -n "8081" Dockerfile` |
 | Eval numbers 15.0 / 52.5 / 62.5 (E6) | `git grep -n "accuracy_pct" backend/tests/eval_results_baseline.json backend/tests/resolver_eval_results.json` |
 | strict/relaxed checker lines (E6) | `git grep -n "def check_action_strict\|def check_action_relaxed" backend/tests/eval_harness.py` |
-| Neo4j rejection text (E7) | `git grep -n "never Neo4j" docs/operational-graph-master-plan.md` |
+| Neo4j rejection text (E7) | `git grep -n "never Neo4j" docs/archive/operational-graph-master-plan.md [doc removed 2026-07-13; historical citation]` |
 | Gemini quota 0 (E7) | `git grep -n "limit: 0" gemini_test_response.txt` |
 | Chat scratch ports (E7) | `git grep -n "PORT = 8080" serve_chat.py; git grep -n "11434" chat.html` |
 | Private docs gitignored (E8) | `git grep -n "company_brain_PRD_v4" .gitignore` |

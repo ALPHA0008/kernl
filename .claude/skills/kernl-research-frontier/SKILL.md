@@ -131,5 +131,5 @@ Facts in this skill were verified against the repository on 2026-07-10. Re-verif
 | Graph-policy information loss | `sed -n '61,100p' backend/engine/nodes/build_operational_graph.py` |
 | Graph traversal’s required edge | `sed -n '32,108p' backend/runtime/graph_retriever.py` |
 | Provenance/version persistence | `sed -n '41,88p' backend/engine/nodes/write_brain.py` |
-| Rivanly contradictions and architecture intent | `grep -n "30-day\|60-day\|validity\|temporal" data/sources/rivanly-inc/* docs/operational-graph-master-plan.md` |
+| Rivanly contradictions and architecture intent | `grep -n "30-day\|60-day\|validity\|temporal" data/sources/rivanly-inc/* docs/archive/operational-graph-master-plan.md [doc removed 2026-07-13; historical citation]` |
 | Diagnostics scripts and artifact scope | `Get-ChildItem .claude/skills/kernl-diagnostics-and-tooling/scripts; python .claude/skills/kernl-diagnostics-and-tooling/scripts/brain_audit.py backend/tests/last_compiled_brain.json` |

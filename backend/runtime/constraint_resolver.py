@@ -30,6 +30,14 @@ DEFAULT_THRESHOLDS = {
     "score_differential_threshold": 0.10,
 }
 
+# W1 (constitutional -- CLAUDE.md): the operational graph is NOT decision
+# authority. Compiled graph policies are unconditional approves
+# (backend/engine/nodes/build_operational_graph.py), so the graph path is
+# disabled on the enforce path. Unit tests may flip this to exercise the
+# mechanism; production code must never set it True without an
+# evidence-citing decision record.
+GRAPH_AUTHORITY_ENABLED = False
+
 
 def _get_thresholds(metadata: dict = None) -> dict:
     th = dict(DEFAULT_THRESHOLDS)
@@ -542,7 +550,8 @@ def resolve(
 
     graph_fallback_th = thresholds["graph_fallback_threshold"]
     graph_success = (
-        isinstance(graph_result, dict)
+        GRAPH_AUTHORITY_ENABLED
+        and isinstance(graph_result, dict)
         and graph_result.get("success", False)
         and graph_result.get("graph_confidence", 0.0) >= graph_fallback_th
     )

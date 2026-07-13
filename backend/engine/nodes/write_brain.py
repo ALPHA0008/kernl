@@ -3,6 +3,7 @@ import json
 import uuid
 import datetime
 from backend.engine.state import BrainState
+from backend.bundle.converter import extraction_warnings, skills_to_drafts
 from backend.core.db.supabase import get_client
 from backend.core.llm import get_embeddings
 from backend.core.sse import emit
@@ -34,6 +35,28 @@ async def write_brain(state: BrainState) -> dict:
     embeddings = get_embeddings(skill_texts)
     for skill, emb in zip(final_skills, embeddings):
         skill["embedding_vector"] = emb
+
+    # Step 6 (V1): extraction output is a PROPOSAL, not authority. Convert
+    # skills to reviewable policy drafts and surface silent-extraction
+    # failures (W8) as visible warnings instead of quiet successes.
+    drafts = skills_to_drafts(final_skills, company_id)
+    warnings = extraction_warnings(dict(state))
+    if warnings:
+        for w in warnings:
+            print(f"[{job_id}] WARNING {w}")
+        await emit(job_id, "compile_warnings", {"warnings": warnings})
+    await emit(
+        job_id,
+        "stage",
+        {
+            "name": "DRAFTS_PROPOSED",
+            "detail": (
+                f"{len(drafts)} policy drafts proposed for review "
+                f"({sum(1 for d in drafts if d.publishable)} publishable as-is); "
+                "drafts are never runtime authority"
+            ),
+        },
+    )
 
     operational_graph = state.get("operational_graph", {})
     operational_metadata = state.get("operational_metadata", {})
@@ -143,12 +166,34 @@ async def write_brain(state: BrainState) -> dict:
                 )
             db.table("relationship_edges").insert(rel_rows).execute()
 
+        draft_rows = [
+            {
+                "draft_id": d.draft_id,
+                "company_id": company_id,
+                "compile_job_id": str(job_id) if job_id else None,
+                "source_skill_id": d.source_skill_id,
+                "proposed_json": d.proposed_policy,
+                "issues_json": list(d.issues),
+                "evidence_texts": list(d.evidence_texts),
+                "publishable": d.publishable,
+                "status": "pending_review",
+            }
+            for d in drafts
+        ]
+        if draft_rows:
+            try:
+                db.table("policy_drafts").insert(draft_rows).execute()
+            except Exception as draft_err:  # drafts must never fail the compile
+                warnings.append(f"policy_drafts persistence failed: {draft_err}")
+                print(f"[{job_id}] WARNING policy_drafts insert failed: {draft_err}")
+
         db.table("compile_runs").update(
             {
                 "status": "complete",
                 "completed_at": now_iso,
                 "duration_ms": duration_ms,
                 "result_version": version_str,
+                "warnings": warnings or None,
             }
         ).eq("id", job_id).execute()
 

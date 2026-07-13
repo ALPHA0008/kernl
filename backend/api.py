@@ -21,7 +21,6 @@ import datetime
 
 from backend.engine.graph import build_compilation_graph
 from backend.core.sse import event_bus, emit
-from backend.runtime.brain_agent import handle_agent_query
 from backend.core.db.supabase import (
     get_client,
     get_brain_by_version,
@@ -35,7 +34,10 @@ from backend.core.models.schemas import (
     SkillsImportRequest,
 )
 
+from backend.v1_api import router as v1_router
+
 app = FastAPI(title="Kernl API", version="2.1.0")
+app.include_router(v1_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -248,23 +250,30 @@ async def compile_status(job_id: str):
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Agent query
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-@app.post("/agent/handle")
-async def agent_handle_endpoint(req: AgentHandleRequest):
-    result = await handle_agent_query(
-        req.company_id, req.scenario, req.context, req.with_brain
-    )
-    return result
+# RETIRED (Step 6, 2026-07-13): the legacy free-text agent endpoints are gone.
+# They cannot be proxied honestly -- mapping prose scenarios to typed facts is
+# a review-time responsibility, not a runtime guess. Decisions now go through
+# the deterministic, ledgered path: POST /v1/decisions/evaluate (typed facts,
+# API key required). handle_agent_query remains importable for the legacy
+# eval harness only.
+_RETIREMENT = {
+    "error": "gone",
+    "detail": (
+        "This endpoint is retired. Use POST /v1/decisions/evaluate with typed "
+        "facts and an X-API-Key header. Free-text scenarios are not evaluated "
+        "at runtime; policy review maps prose to typed facts."
+    ),
+}
 
 
-@app.post("/agent/query")
-async def agent_query_endpoint(req: AgentQueryRequest):
-    result = await handle_agent_query(
-        req.company_id,
-        req.scenario_text,
-        req.json_context,
-        req.with_brain,
-    )
-    return result
+@app.post("/agent/handle", status_code=410)
+async def agent_handle_endpoint(_req: AgentHandleRequest):
+    return _RETIREMENT
+
+
+@app.post("/agent/query", status_code=410)
+async def agent_query_endpoint(_req: AgentQueryRequest):
+    return _RETIREMENT
 
 
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
