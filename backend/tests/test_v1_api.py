@@ -193,6 +193,19 @@ def test_tenant_isolation_over_http():
     assert r.status_code == 409  # no published bundle for tenant
 
 
+def test_metrics_endpoint_reflects_decisions():
+    cl = _client()
+    assert cl.get("/v1/metrics").status_code == 401  # fail-closed like everything else
+    cl.post("/v1/decisions/evaluate", headers=AGENT, json={
+        "workflow": "refund", "facts": {"plan_type": "annual", "days_since_purchase": 9},
+        "idempotency_key": "metrics-probe"})
+    text = cl.get("/v1/metrics", headers=AGENT).text
+    assert "# TYPE kernl_decisions_total counter" in text
+    assert 'kernl_decisions_total{outcome="approve",tenant="rivanly-inc"}' in text
+    assert "# TYPE kernl_decision_latency_ms histogram" in text
+    assert "kernl_decision_latency_ms_count{" in text
+
+
 TESTS = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
 
 if __name__ == "__main__":

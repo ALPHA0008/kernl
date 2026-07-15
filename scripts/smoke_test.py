@@ -1,333 +1,186 @@
-"""
-Smoke test: proves the system is dynamic by modifying a source doc,
-recompiling, and verifying that skills and agent answers change.
+"""V1 smoke test: proves the full Decision Ledger loop works end-to-end
+against a running /v1 server -- provisioning, onboarding, evaluation, trace,
+ledger, escalation, adjudication, replay-gated publish, and metrics.
+
+This replaces the legacy compile-pipeline smoke test (retired with /agent/*).
+Matches docs/V1_EXECUTION_PLAN.md Step 8 DoD: "smoke test green end-to-end."
+
+Provisions a throwaway tenant (smoke-<random>) so it never touches the seeded
+rivanly-inc reference data. Requires KERNL_ADMIN_KEY to match the running
+server's admin key.
 
 Usage:
-    python scripts/smoke_test.py
-
-Requires: backend running on http://localhost:8081
+    KERNL_ADMIN_KEY=... python scripts/smoke_test.py [--base-url http://127.0.0.1:8000]
 """
 
-import requests
-import time
-import sys
+from __future__ import annotations
+
+import argparse
 import os
-import json
+import secrets
+import sys
 
-API = "http://localhost:8081"
-COMPANY = "rivanly-inc"
+import httpx
 
-# Path to a source doc we'll modify
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SOP_PATH = os.path.join(BASE_DIR, "data", "sources", COMPANY, "notion_refund_sop.md")
+SOURCE_TEXT = (
+    "Refund Policy\n\n"
+    "Customers on annual plans who request a refund within 14 days of "
+    "purchase receive a full refund.\n"
+)
 
-
-def check_health():
-    print("1. Checking API health...")
-    r = requests.get(f"{API}/health")
-    assert r.status_code == 200, f"Health check failed: {r.text}"
-    data = r.json()
-    print(f"   API: {data['status']}, vLLM: {data['vllm']}, DB: {data['database']}")
-    return True
+_passed = 0
+_failed = 0
 
 
-def read_sop():
-    with open(SOP_PATH, "r", encoding="utf-8") as f:
-        return f.read()
-
-
-def write_sop(content: str):
-    with open(SOP_PATH, "w", encoding="utf-8") as f:
-        f.write(content)
-
-
-def compile_and_wait():
-    """Trigger compilation and poll until complete."""
-    print("   Triggering compilation...")
-    r = requests.post(f"{API}/compile", json={"company_id": COMPANY})
-    assert r.status_code == 200, f"Compile failed: {r.text}"
-    job_id = r.json()["job_id"]
-    print(f"   Job ID: {job_id}")
-
-    # Poll the compile stream for completion
-    for attempt in range(60):  # max 5 minutes
-        time.sleep(5)
-
-        # Check job status explicitly
-        try:
-            status_req = requests.get(f"{API}/compile/{job_id}/status")
-            if status_req.status_code == 200:
-                job_info = status_req.json()
-                if job_info.get("status") == "error":
-                    print(f"   [ERROR] Job failed: {job_info.get('error_detail')}")
-                    raise RuntimeError(
-                        f"Compilation job failed: {job_info.get('error_detail')}"
-                    )
-                if job_info.get("status") == "complete":
-                    # Fetch skills
-                    sk = requests.get(f"{API}/skills/{COMPANY}")
-                    if sk.status_code == 200:
-                        data = sk.json()
-                        skills = data.get("skills", [])
-                        print(f"   Compilation produced {len(skills)} skills")
-                        return data
-        except Exception as e:
-            if isinstance(e, RuntimeError):
-                raise
-            pass
-
-        print(f"   Waiting... ({(attempt + 1) * 5}s)")
-
-    # Timeout reached. Fetch final status.
-    final_status = "Unknown"
-    final_error = "None"
-    try:
-        status_req = requests.get(f"{API}/compile/{job_id}/status")
-        if status_req.status_code == 200:
-            job_info = status_req.json()
-            final_status = job_info.get("status", "Unknown")
-            final_error = job_info.get("error_detail", "None")
-    except Exception:
-        pass
-
-    raise TimeoutError(
-        f"Compilation did not complete within 5 minutes. Final status: {final_status}, Error: {final_error}"
-    )
-
-
-def get_skills():
-    r = requests.get(f"{API}/skills/{COMPANY}")
-    assert r.status_code == 200, f"Skills fetch failed: {r.text}"
-    return r.json()
-
-
-def query_agent(scenario: str, context: dict = None):
-    r = requests.post(
-        f"{API}/agent/query",
-        json={
-            "company_id": COMPANY,
-            "scenario_text": scenario,
-            "json_context": context or {},
-        },
-    )
-    assert r.status_code == 200, f"Agent query failed: {r.text}"
-    return r.json()
-
-
-def test_gibberish():
-    """Gibberish should get low confidence and no specific action."""
-    print("\n3. Testing gibberish rejection...")
-    result = query_agent("blah blah blah fafa asdfasdf")
-    confidence = result.get("confidence", 1.0)
-    print(f"   Gibberish confidence: {confidence}")
-    print(f"   Action: {result.get('recommended_action', 'N/A')}")
-    if confidence < 0.4:
-        print("   [PASS] Low confidence for gibberish")
+def check(label: str, condition: bool, detail: str = "") -> None:
+    global _passed, _failed
+    if condition:
+        _passed += 1
+        print(f"  OK   {label}")
     else:
-        print(
-            f"   [WARN] Confidence {confidence} is higher than expected for gibberish"
-        )
+        _failed += 1
+        print(f"  FAIL {label}  {detail}")
 
 
-def test_dynamic_policy_change():
-    """
-    Core test: modify the refund SOP, recompile, and verify the change propagates.
-    """
-    print("\n4. Testing dynamic policy change...")
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--base-url", default=os.environ.get("KERNL_API_URL", "http://127.0.0.1:8000"))
+    args = parser.parse_args()
 
-    # Save original SOP
-    original_sop = read_sop()
-    print(f"   Original SOP loaded ({len(original_sop)} chars)")
+    admin_key = os.environ.get("KERNL_ADMIN_KEY")
+    if not admin_key:
+        print("ERROR: set KERNL_ADMIN_KEY to the running server's admin key.")
+        return 2
 
-    # Compile with original SOP (this may already be done)
-    print("\n   Step A: Compile with ORIGINAL policy...")
-    skills_v1 = compile_and_wait()
-    skills_v1_text = json.dumps(skills_v1)
+    c = httpx.Client(base_url=args.base_url, timeout=30.0)
+    admin = {"X-API-Key": admin_key}
 
-    # Query the agent about refunds with original policy
-    print("\n   Step B: Query agent about refunds (original policy)...")
-    result_v1 = query_agent(
-        "Customer requesting a refund after 45 days",
-        {"plan": "annual", "days_since_purchase": 45, "tenure_months": 6},
-    )
-    print(f"   v1 action: {result_v1.get('recommended_action')}")
-    print(f"   v1 rule: {result_v1.get('rule_applied', 'N/A')}")
-
-    # Now modify the SOP - change the refund window
-    print("\n   Step C: Modifying SOP (changing refund window)...")
-    modified_sop = (
-        original_sop.replace("30 day", "60 day")
-        .replace("30-day", "60-day")
-        .replace("30 days", "60 days")
-    )
-    if modified_sop == original_sop:
-        # Try alternative patterns
-        modified_sop = original_sop.replace("30", "60")
-
-    write_sop(modified_sop)
-    print("   SOP modified: 30 -> 60 days")
-
-    # Recompile
-    print("\n   Step D: Recompiling with MODIFIED policy...")
-    skills_v2 = compile_and_wait()
-    skills_v2_text = json.dumps(skills_v2)
-
-    # Check that skills actually changed
-    changed = skills_v1_text != skills_v2_text
-    print(f"\n   Skills changed after recompile: {changed}")
-
-    # Query the agent again
-    print("\n   Step E: Query agent about refunds (modified policy)...")
-    result_v2 = query_agent(
-        "Customer requesting a refund after 45 days",
-        {"plan": "annual", "days_since_purchase": 45, "tenure_months": 6},
-    )
-    print(f"   v2 action: {result_v2.get('recommended_action')}")
-    print(f"   v2 rule: {result_v2.get('rule_applied', 'N/A')}")
-
-    # Check for the policy change in v2
-    v2_mentions_60 = "60" in json.dumps(result_v2)
-    print(f"   v2 references '60': {v2_mentions_60}")
-
-    # Check if actions actually changed based on policy
-    v1_action_lower = str(result_v1.get("recommended_action", "")).lower()
-    v2_action_lower = str(result_v2.get("recommended_action", "")).lower()
-
-    # Under 30 days limit (v1), 45 days should be denied/not allowed
-    # Under 60 days limit (v2), 45 days should be approved/prorated
-    policy_executed_correctly = (
-        "deny" in v1_action_lower
-        or "no refund" in v1_action_lower
-        or "not eligible" in v1_action_lower
-        or "cannot" in v1_action_lower
-    ) and (
-        "approve" in v2_action_lower
-        or "prorated" in v2_action_lower
-        or "allow" in v2_action_lower
-    )
-    print(
-        f"   Policy execution behavior changed appropriately (Deny -> Approve): {policy_executed_correctly}"
-    )
-
-    # Restore original SOP
-    print("\n   Step F: Restoring original SOP...")
-    write_sop(original_sop)
-    print("   Original SOP restored.")
-
-    # Final verdict
-    print("\n   --- RESULTS ---")
-    if changed:
-        print("   [PASS] Skills changed after source modification and recompile")
-    else:
-        print("   [FAIL] Skills did NOT change - system may still be static")
-
-    if policy_executed_correctly:
-        print(
-            "   [PASS] Agent correctly executed the policy change (Denied at 45 days under 30-day SOP, Approved under 60-day SOP!)"
-        )
-    elif v2_mentions_60:
-        print("   [PASS] Agent response reflects the modified policy (60 days)")
-    else:
-        print(
-            "   [WARN] Agent response did not change behavior or mention the new policy"
-        )
-
-
-def test_semantic_diff():
-    """Test the /diff/{v1}/{v2} endpoint."""
-    print("\n5. Testing semantic diff engine...")
-
-    # Get version history
-    r = requests.get(f"{API}/brain/versions/{COMPANY}")
+    print(f"1. Health check against {args.base_url}")
+    r = c.get("/v1/health")
+    check("GET /v1/health -> 200", r.status_code == 200, str(r.status_code))
     if r.status_code != 200:
-        print("   [SKIP] Could not fetch version history")
-        return
+        print("Backend unreachable -- aborting.")
+        return 1
 
-    versions = r.json().get("versions", [])
-    if len(versions) < 2:
-        print("   [SKIP] Need at least 2 compiled versions for diff")
-        return
+    print("2. Provision a throwaway tenant")
+    co = f"smoke-{secrets.token_hex(4)}"
+    r = c.post("/v1/tenants", headers=admin, json={"company_id": co, "name": "Smoke Test"})
+    check("POST /v1/tenants -> 200", r.status_code == 200, r.text[:200])
+    owner_key = r.json()["owner_api_key"]
+    OWNER = {"X-API-Key": owner_key}
+    check("owner_api_key issued", owner_key.startswith("kk_"))
 
-    v1 = versions[1]["version"]
-    v2 = versions[0]["version"]
-    print(f"   Comparing {v1} → {v2}")
+    r = c.get("/v1/me", headers=OWNER)
+    check("GET /v1/me resolves the issued key", r.status_code == 200 and r.json()["role"] == "owner")
 
-    r = requests.get(f"{API}/diff/{v1}/{v2}", params={"company_id": COMPANY})
-    if r.status_code != 200:
-        print(f"   [FAIL] Diff endpoint returned {r.status_code}: {r.text}")
-        return
+    print("3. New tenant has no bundle yet")
+    r = c.get("/v1/bundles/active", headers=OWNER)
+    check("GET /v1/bundles/active -> 404 before onboarding", r.status_code == 404)
 
-    diff = r.json()
-    summary = diff.get("summary", {})
-    print(
-        f"   Added: {summary.get('added_count', 0)}, Deleted: {summary.get('deleted_count', 0)}, Modified: {summary.get('modified_count', 0)}"
-    )
-    print(f"   Confidence shifts: {summary.get('confidence_shift_count', 0)}")
-    print(
-        f"   V1 skills: {summary.get('v1_skills', 0)} → V2 skills: {summary.get('v2_skills', 0)}"
-    )
+    print("4. Onboarding: upload source, author, ground, accept, assemble")
+    r = c.post("/v1/sources", headers=OWNER, json={"filename": "refund.md", "content": SOURCE_TEXT})
+    check("POST /v1/sources -> 200", r.status_code == 200, r.text[:200])
+    source_id = r.json()["source_id"]
 
-    if (
-        summary.get("added_count", 0) > 0
-        or summary.get("modified_count", 0) > 0
-        or summary.get("deleted_count", 0) > 0
-        or summary.get("confidence_shift_count", 0) > 0
-    ):
-        print("   [PASS] Semantic diff detected changes between versions")
-    else:
-        print(
-            "   [WARN] Diff returned no changes — may indicate skills didn't change or diff has a bug"
-        )
+    policy = {
+        "id": "refund.annual_14d", "workflow": "refund",
+        "effect": {"kind": "approve", "action": "approve_full_refund"}, "priority": 70,
+        "conditions": [{"field": "days_since_purchase", "operator": "lte",
+                        "value": 14, "value_type": "number"}],
+        "authority": {"approval_required": False}, "evidence": [], "overrides": [],
+        "unconditional_ack": False, "rationale": "smoke test",
+    }
+    r = c.post("/v1/onboarding/drafts", headers=OWNER, json={"proposed": policy})
+    check("POST /v1/onboarding/drafts -> 200", r.status_code == 200, r.text[:200])
+    draft = r.json()
+    draft_id = draft["draft_id"]
+    check("fresh draft is not publishable (no citation yet)", draft["publishable"] is False)
 
+    start = SOURCE_TEXT.index("Customers on annual")
+    end = SOURCE_TEXT.index("full refund.") + len("full refund.")
+    excerpt = SOURCE_TEXT[start:end]
+    r = c.post(f"/v1/onboarding/drafts/{draft_id}/ground", headers=OWNER,
+               json={"source_id": source_id, "span_start": start, "span_end": end, "excerpt": excerpt})
+    check("ground with the exact source span -> publishable", r.status_code == 200 and r.json()["publishable"])
 
-def main():
-    print("=" * 60)
-    print("KERNL SMOKE TEST — Proving the system is dynamic")
-    print("=" * 60)
+    r = c.post(f"/v1/onboarding/drafts/{draft_id}/ground", headers=OWNER,
+               json={"source_id": source_id, "span_start": 0, "span_end": 10, "excerpt": "not the bytes"})
+    check("grounding a WRONG span -> 400 (no uncited norm)", r.status_code == 400)
 
-    try:
-        check_health()
-    except Exception as e:
-        print(f"   [FATAL] API not reachable: {e}")
-        print(
-            "   Make sure backend is running: python -m uvicorn backend.api:app --port 8081"
-        )
-        sys.exit(1)
+    r = c.post(f"/v1/onboarding/drafts/{draft_id}/status", headers=OWNER, json={"status": "accepted"})
+    check("accept the grounded draft -> 200", r.status_code == 200)
 
-    # Test 1: Compile and get skills
-    print("\n2. Initial compilation...")
-    try:
-        skills = compile_and_wait()
-        print(f"   Got {len(skills.get('skills', []))} skills")
-    except Exception as e:
-        print(f"   [ERROR] Compilation failed: {e}")
-        sys.exit(1)
+    r = c.post("/v1/onboarding/assemble", headers=OWNER)
+    check("assemble accepted drafts into a bundle -> 200", r.status_code == 200, r.text[:200])
+    record_id = r.json()["record_id"]
 
-    # Test 2: Gibberish rejection
-    try:
-        test_gibberish()
-    except Exception as e:
-        print(f"   [ERROR] Gibberish test failed: {e}")
+    print("5. Publish gate: blocked without replay, then unlocked")
+    r = c.post(f"/v1/bundles/{record_id}/publish", headers=OWNER)
+    check("publish without acknowledged replay -> 409", r.status_code == 409)
 
-    # Test 3: Dynamic policy change
-    try:
-        test_dynamic_policy_change()
-    except Exception as e:
-        print(f"   [ERROR] Dynamic test failed: {e}")
-        # Make sure we restore the SOP
-        if os.path.exists(SOP_PATH):
-            print("   Attempting to restore original SOP...")
+    r = c.post("/v1/replays", headers=OWNER, json={"candidate_record_id": record_id})
+    check("run replay (empty golden set = clean baseline) -> 200", r.status_code == 200)
+    run_id = r.json()["run_id"]
+    c.post(f"/v1/replays/{run_id}/acknowledge", headers=OWNER)
 
-    # Test 4: Semantic diff
-    try:
-        test_semantic_diff()
-    except Exception as e:
-        print(f"   [ERROR] Diff test failed: {e}")
+    r = c.post(f"/v1/bundles/{record_id}/publish", headers=OWNER)
+    check("publish after acknowledgment -> 200", r.status_code == 200, r.text[:200])
 
-    print("\n" + "=" * 60)
-    print("SMOKE TEST COMPLETE")
-    print("=" * 60)
+    r = c.get("/v1/bundles/active", headers=OWNER)
+    check("active bundle now serves the published content", r.status_code == 200)
+
+    print("6. Evaluate a real decision + inspect its trace")
+    r = c.post("/v1/decisions/evaluate", headers=OWNER, json={
+        "workflow": "refund", "facts": {"days_since_purchase": 9},
+        "idempotency_key": "smoke-decision-1"})
+    check("POST /v1/decisions/evaluate -> 200", r.status_code == 200, r.text[:200])
+    decision = r.json()
+    check("outcome is approve/approve_full_refund",
+          decision["outcome"]["kind"] == "approve" and decision["outcome"]["action"] == "approve_full_refund")
+
+    r = c.get(f"/v1/decisions/{decision['decision_id']}", headers=OWNER)
+    check("GET /v1/decisions/{id} returns the full trace", r.status_code == 200)
+    trace = r.json()["trace"]
+    check("trace cites the winning policy", trace["precedence"]["winner"] == "refund.annual_14d")
+
+    print("7. Idempotency: same key returns the SAME decision")
+    r2 = c.post("/v1/decisions/evaluate", headers=OWNER, json={
+        "workflow": "refund", "facts": {"days_since_purchase": 999},
+        "idempotency_key": "smoke-decision-1"})
+    check("retry with the same key -> created=False, same id",
+          r2.json()["created"] is False and r2.json()["decision_id"] == decision["decision_id"])
+
+    print("8. Escalation: missing facts -> escalate -> adjudicate")
+    r = c.post("/v1/decisions/evaluate", headers=OWNER, json={
+        "workflow": "refund", "facts": {}, "idempotency_key": "smoke-escalation-1"})
+    check("evaluate with no facts -> escalate", r.json()["outcome"]["kind"] == "escalate")
+    esc_id = r.json()["escalation_id"]
+    check("escalation was opened", esc_id is not None)
+
+    r = c.post(f"/v1/escalations/{esc_id}/resolve", headers=OWNER, json={
+        "chosen_action": "approve_full_refund", "outcome_kind": "approve",
+        "rationale": "Smoke test adjudication.", "promote_to_golden": True})
+    check("resolve escalation -> 200", r.status_code == 200, r.text[:200])
+
+    r = c.get("/v1/cases", headers=OWNER)
+    promoted = [x for x in r.json()["cases"] if x["provenance"].startswith("adjudication:")]
+    check("adjudication promoted a non-synthetic golden case", len(promoted) == 1 and not promoted[0]["synthetic"])
+
+    print("9. Ledger integrity")
+    r = c.get("/v1/ledger/verify", headers=OWNER)
+    check("hash chain verifies", r.status_code == 200 and r.json()["chain_valid"] is True)
+
+    print("10. Metrics reflect this run")
+    r = c.get("/v1/metrics", headers=OWNER)
+    text = r.text
+    check("GET /v1/metrics -> 200", r.status_code == 200)
+    check("kernl_decisions_total counter present", "kernl_decisions_total" in text)
+    check("kernl_decision_latency_ms histogram present", "kernl_decision_latency_ms" in text)
+
+    c.close()
+    print(f"\nResults: {_passed} passed, {_failed} failed  (tenant {co})")
+    return 1 if _failed else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

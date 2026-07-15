@@ -18,6 +18,7 @@ Endpoints (all under /v1, all tenant-scoped by API key):
     GET  /v1/cases                     golden case corpus
     GET  /v1/me                        principal introspection (tenant + role)
     GET  /v1/health
+    GET  /v1/metrics                   Prometheus text: latency/outcome/escalation counters
 
 AUTH: X-API-Key header. Keys come from the KERNL_API_KEYS env var:
     KERNL_API_KEYS="<key>:<company_id>:<role>[,<key>:<company_id>:<role>...]"
@@ -38,9 +39,10 @@ is a container change, not an API change.
 from __future__ import annotations
 
 import os
+import time
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from backend.bundle.lifecycle import PublishGateError
@@ -48,6 +50,7 @@ from backend.bundle.schema import Bundle
 from backend.escalation.service import AlreadyResolvedError
 from backend.ledger.events import Actor
 from backend.ledger.service import LedgerUnavailableError
+from backend.observability import METRICS, log_event, observe_latency, render_prometheus
 from backend.runtime.evaluator import InvalidFactsError
 from backend.v1_container import Container, get_container
 
@@ -173,8 +176,10 @@ def evaluate_decision(
     p: Principal = Depends(require("agent")),
     c: Container = Depends(get_container),
 ):
+    started = time.perf_counter()
     active = c.lifecycle.active_bundle(p.company_id)
     if active is None:
+        METRICS.inc("kernl_decisions_total", {"tenant": p.company_id, "outcome": "no_bundle"})
         raise HTTPException(status_code=409, detail="no published bundle for tenant")
     try:
         event, created = c.decisions.decide(
@@ -187,14 +192,38 @@ def evaluate_decision(
             bundle_hash=active.content_hash,
         )
     except KeyError as exc:
+        METRICS.inc("kernl_decisions_total", {"tenant": p.company_id, "outcome": "error_unknown_workflow"})
         raise HTTPException(status_code=400, detail=f"unknown workflow: {exc}") from exc
     except InvalidFactsError as exc:
+        METRICS.inc("kernl_decisions_total", {"tenant": p.company_id, "outcome": "error_invalid_facts"})
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except LedgerUnavailableError as exc:
+        METRICS.inc("kernl_decisions_total", {"tenant": p.company_id, "outcome": "error_ledger_unavailable"})
         raise HTTPException(status_code=503, detail=f"ledger unavailable: {exc}") from exc
 
     escalation = c.escalations.open_for(event) if created else c.escalations_by_decision(
         p.company_id, event.event_id
+    )
+    elapsed_ms = observe_latency(
+        "kernl_decision_latency_ms", started, {"tenant": p.company_id, "workflow": req.workflow}
+    )
+    METRICS.inc(
+        "kernl_decisions_total",
+        {"tenant": p.company_id, "outcome": event.outcome.get("kind", "unknown")},
+    )
+    if escalation is not None and created:
+        METRICS.inc("kernl_escalations_opened_total", {"tenant": p.company_id})
+    log_event(
+        "decision.evaluated",
+        tenant=p.company_id,
+        decision_id=event.event_id,
+        workflow=req.workflow,
+        bundle_hash=event.bundle_hash,
+        outcome_kind=event.outcome.get("kind"),
+        created=created,
+        escalation_id=escalation.escalation_id if escalation else None,
+        latency_ms=round(elapsed_ms, 2),
+        actor=f"{p.actor().type}:{p.actor().id}",
     )
     return {
         "decision_id": event.event_id,
@@ -295,7 +324,17 @@ def publish_bundle(
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except PublishGateError as exc:
+        METRICS.inc("kernl_publishes_total", {"tenant": p.company_id, "result": "gate_blocked"})
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    METRICS.inc("kernl_publishes_total", {"tenant": p.company_id, "result": "published"})
+    log_event(
+        "bundle.published",
+        tenant=p.company_id,
+        bundle_hash=record.content_hash,
+        record_id=record.record_id,
+        replay_run_id=record.replay_run_id,
+        published_by=p.key_id,
+    )
     return {"record_id": record.record_id, "content_hash": record.content_hash,
             "status": record.status.value, "replay_run_id": record.replay_run_id}
 
@@ -436,6 +475,17 @@ def resolve_escalation(
         raise HTTPException(status_code=503, detail=f"ledger unavailable: {exc}") from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    METRICS.inc("kernl_escalations_resolved_total", {"tenant": p.company_id, "outcome": req.outcome_kind})
+    log_event(
+        "escalation.resolved",
+        tenant=p.company_id,
+        escalation_id=escalation_id,
+        decision_id=esc.decision_event_id,
+        adjudication_event_id=esc.resolution.adjudication_event_id if esc.resolution else None,
+        outcome_kind=req.outcome_kind,
+        promoted_to_golden=req.promote_to_golden,
+        resolver=f"{p.key_id}",
+    )
     return esc.model_dump(mode="json")
 
 
@@ -744,3 +794,13 @@ def v1_health(_c: Container = Depends(get_container)):
     # the container dependency is intentional: first health ping initializes
     # stores + seed, so a green /v1/health means "ready to decide"
     return {"status": "ok", "evaluator": "kernl-evaluator/1.0.0"}
+
+
+@router.get("/metrics")
+def v1_metrics(_p: Principal = Depends(require("agent"))):
+    """Prometheus text exposition format: decision latency histograms, and
+    decision/escalation/publish counters labeled by tenant + outcome. Any
+    valid tenant key can read it (metrics are process-wide, not a leak of
+    another tenant's ledger data) -- but the endpoint stays behind auth
+    because the API is fail-closed everywhere, no exceptions."""
+    return Response(content=render_prometheus(), media_type="text/plain; version=0.0.4")

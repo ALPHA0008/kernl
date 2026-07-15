@@ -9,3 +9,4 @@ python-dotenv
 python-multipart
 pydantic
 psycopg[binary]>=3.2
+hypothesis>=6.100
