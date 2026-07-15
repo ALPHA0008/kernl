@@ -3,7 +3,7 @@ uvicorn[standard]
 openai
 langgraph>=0.4
 sentence-transformers
-numpy
+numpy<2  # pandas 2.0.3 (pulled in transitively via sentence-transformers) needs the numpy 1.x ABI
 supabase
 python-dotenv
 python-multipart
