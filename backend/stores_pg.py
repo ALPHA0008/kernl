@@ -40,7 +40,7 @@ from psycopg.types.json import Jsonb
 from backend.bundle.lifecycle import BundleRecord, BundleStatus
 from backend.bundle.schema import Bundle
 from backend.escalation.service import Escalation, EscalationStatus
-from backend.ledger.events import DecisionEvent
+from backend.ledger.events import ChainConflict, DecisionEvent
 from backend.onboarding.drafts import OnboardingDraft
 from backend.onboarding.sources import SourceSnapshot
 from backend.onboarding.tenants import ApiKeyRecord, Tenant
@@ -168,7 +168,7 @@ class PgLedgerStore(_Pg):
                 expected_prev = head["event_hash"] if head else None
                 next_seq = (head["seq"] + 1) if head else 0
                 if event.prev_event_hash != expected_prev:
-                    raise ValueError(
+                    raise ChainConflict(
                         "chain break: prev_event_hash does not match stream head"
                     )
                 cur.execute(

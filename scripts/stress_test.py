@@ -47,7 +47,7 @@ def check(label: str, condition: bool, detail: str = "") -> None:
 def provision_and_publish(base_url: str, admin_key: str) -> tuple[str, str]:
     """Returns (company_id, owner_key) for a throwaway tenant with one
     published policy, ready to receive decisions."""
-    c = httpx.Client(base_url=base_url, timeout=30.0)
+    c = httpx.Client(base_url=base_url, timeout=90.0)
     admin = {"X-API-Key": admin_key}
     co = f"stress-{secrets.token_hex(4)}"
     key = c.post("/v1/tenants", headers=admin, json={"company_id": co, "name": "Stress Test"}).json()["owner_api_key"]
@@ -117,7 +117,7 @@ def main() -> int:
         print("ERROR: set KERNL_ADMIN_KEY to the running server's admin key.")
         return 2
 
-    c = httpx.Client(base_url=args.base_url, timeout=30.0)
+    c = httpx.Client(base_url=args.base_url, timeout=90.0)
     r = c.get("/v1/health")
     check("backend reachable", r.status_code == 200)
     if r.status_code != 200:

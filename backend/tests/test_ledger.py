@@ -22,7 +22,9 @@ from backend.bundle.schema import (
     Policy,
     WorkflowSpec,
 )
-from backend.ledger.events import Actor
+import threading
+
+from backend.ledger.events import Actor, ChainConflict
 from backend.ledger.service import DecisionService, LedgerUnavailableError
 from backend.ledger.store import InMemoryLedgerStore
 
@@ -198,6 +200,70 @@ def test_tenant_isolation():
     _decide(svc, key="a")
     assert store.list("other-co") == []
     assert store.chain_head("other-co") is None
+
+
+def test_chain_conflict_retried_transparently():
+    """A concurrent writer wins the race once; the losing seal must be
+    re-sealed against the new head and retried, not surfaced to the caller."""
+    store = InMemoryLedgerStore()
+    real_append = store.append
+    calls = {"n": 0}
+
+    def flaky_append(event):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise ChainConflict("simulated race: another writer won the head")
+        return real_append(event)
+
+    store.append = flaky_append
+    svc = DecisionService(store)
+    event, created = _decide(svc, key="a")
+    assert created is True
+    assert calls["n"] == 2
+    assert store.verify_chain("acme") is True
+
+
+def test_chain_conflict_exhausted_raises_ledger_unavailable_no_partial_write():
+    store = InMemoryLedgerStore()
+
+    def always_conflict(event):
+        raise ChainConflict("simulated permanent contention")
+
+    store.append = always_conflict
+    svc = DecisionService(store)
+    try:
+        _decide(svc, key="a")
+        assert False, "exhausted retries must abort the decision"
+    except LedgerUnavailableError:
+        pass
+    assert store.list("acme") == []
+
+
+def test_concurrent_decisions_same_tenant_never_corrupt_the_chain():
+    """Regression test for a real race found under stress testing: sealing
+    (which reads chain_head) happened outside the store's per-tenant lock,
+    so concurrent decide() calls for the same company could both seal
+    against the same head. One must retry, none may be lost or duplicated,
+    and the chain must verify afterward."""
+    svc, store = _svc()
+    n = 12
+    errors = []
+
+    def worker(i):
+        try:
+            _decide(svc, key=f"conc-{i}", facts={"plan_type": "annual", "days_since_purchase": i})
+        except Exception as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(n)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert errors == [], f"unexpected failures under concurrency: {errors}"
+    assert len(store.list("acme")) == n
+    assert store.verify_chain("acme") is True
 
 
 TESTS = [v for k, v in sorted(globals().items()) if k.startswith("test_")]

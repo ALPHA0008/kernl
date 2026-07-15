@@ -20,6 +20,13 @@ class EventType(str, Enum):
     ADJUDICATION = "adjudication"
 
 
+class ChainConflict(ValueError):
+    """Raised when an event's prev_event_hash no longer matches the stream
+    head at append time -- two writers raced to seal against the same head.
+    Distinct from a tampered/unsealed event: this is a retryable race, not
+    an integrity violation."""
+
+
 class Actor(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 

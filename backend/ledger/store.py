@@ -13,7 +13,7 @@ from __future__ import annotations
 import threading
 from typing import Iterable, Optional, Protocol
 
-from backend.ledger.events import DecisionEvent
+from backend.ledger.events import ChainConflict, DecisionEvent
 
 
 class LedgerStore(Protocol):
@@ -66,7 +66,7 @@ class InMemoryLedgerStore:
             stream = self._events.setdefault(event.company_id, [])
             expected_prev = stream[-1].event_hash if stream else None
             if event.prev_event_hash != expected_prev:
-                raise ValueError(
+                raise ChainConflict(
                     "chain break: prev_event_hash does not match stream head"
                 )
             stream.append(event)

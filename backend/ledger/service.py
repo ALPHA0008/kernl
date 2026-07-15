@@ -14,9 +14,11 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from backend.bundle.schema import Bundle
-from backend.ledger.events import Actor, DecisionEvent, EventType
+from backend.ledger.events import Actor, ChainConflict, DecisionEvent, EventType
 from backend.ledger.store import LedgerStore
 from backend.runtime.evaluator import EvaluationResult, evaluate
+
+_MAX_CHAIN_CONFLICT_RETRIES = 8
 
 
 class LedgerUnavailableError(RuntimeError):
@@ -50,18 +52,19 @@ class DecisionService:
             return existing, False
 
         result: EvaluationResult = evaluate(facts, bundle, workflow)
-        event = self._seal(
-            event_type=EventType.DECISION,
-            company_id=company_id,
-            workflow=workflow,
-            actor=actor,
-            idempotency_key=idempotency_key,
-            facts=facts,
-            result=result,
-            bundle_hash=bundle_hash,
-            linked_event_id=None,
+        return self._append_sealed(
+            lambda: self._seal(
+                event_type=EventType.DECISION,
+                company_id=company_id,
+                workflow=workflow,
+                actor=actor,
+                idempotency_key=idempotency_key,
+                facts=facts,
+                result=result,
+                bundle_hash=bundle_hash,
+                linked_event_id=None,
+            )
         )
-        return self._append(event)
 
     def record_adjudication(
         self,
@@ -91,19 +94,20 @@ class DecisionService:
             "original_event_id": original_event.event_id,
             "original_outcome": original_event.outcome,
         }
-        event = self._seal_raw(
-            event_type=EventType.ADJUDICATION,
-            company_id=company_id,
-            workflow=original_event.workflow,
-            actor=actor,
-            idempotency_key=idempotency_key,
-            facts=original_event.facts,
-            outcome=outcome,
-            trace=trace,
-            bundle_hash=original_event.bundle_hash,
-            linked_event_id=original_event.event_id,
+        return self._append_sealed(
+            lambda: self._seal_raw(
+                event_type=EventType.ADJUDICATION,
+                company_id=company_id,
+                workflow=original_event.workflow,
+                actor=actor,
+                idempotency_key=idempotency_key,
+                facts=original_event.facts,
+                outcome=outcome,
+                trace=trace,
+                bundle_hash=original_event.bundle_hash,
+                linked_event_id=original_event.event_id,
+            )
         )
-        return self._append(event)
 
     # -- internals ----------------------------------------------------------
 
@@ -164,13 +168,29 @@ class DecisionService:
             prev_event_hash=prev,
         ).sealed()
 
-    def _append(self, event: DecisionEvent) -> tuple[DecisionEvent, bool]:
-        try:
-            return self._store.append(event)
-        except ValueError:
-            raise
-        except Exception as exc:  # storage failure -> abort, never fallback
-            raise LedgerUnavailableError(str(exc)) from exc
+    def _append_sealed(self, seal_fn) -> tuple[DecisionEvent, bool]:
+        """seal_fn produces a freshly-sealed event (reads the current chain
+        head). A ChainConflict means a concurrent writer for the same
+        company won the race to the previous head -- re-seal against the
+        new head and retry. This keeps sealing (which reads chain_head)
+        and appending (which locks + validates it) correct under
+        concurrency without holding a lock across the evaluate+seal step."""
+        last_exc: Optional[ChainConflict] = None
+        for _ in range(_MAX_CHAIN_CONFLICT_RETRIES):
+            event = seal_fn()
+            try:
+                return self._store.append(event)
+            except ChainConflict as exc:
+                last_exc = exc
+                continue
+            except ValueError:
+                raise
+            except Exception as exc:  # storage failure -> abort, never fallback
+                raise LedgerUnavailableError(str(exc)) from exc
+        raise LedgerUnavailableError(
+            f"ledger append lost the race to a concurrent writer "
+            f"{_MAX_CHAIN_CONFLICT_RETRIES} times in a row: {last_exc}"
+        )
 
     def _safe(self, fn):
         try:
