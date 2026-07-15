@@ -29,6 +29,14 @@ from backend.escalation.service import (
 from backend.ledger.events import DecisionEvent
 from backend.ledger.service import DecisionService
 from backend.ledger.store import InMemoryLedgerStore, LedgerStore
+from backend.onboarding.drafts import DraftStore, InMemoryDraftStore
+from backend.onboarding.service import OnboardingService
+from backend.onboarding.sources import InMemorySourceStore, SourceStore
+from backend.onboarding.tenants import (
+    InMemoryTenantStore,
+    TenantService,
+    TenantStore,
+)
 from backend.replay.cases import CaseStore, Expected, GoldenCase, InMemoryCaseStore
 from backend.replay.engine import InMemoryReplayRunStore, ReplayEngine, ReplayRunStore
 
@@ -43,18 +51,28 @@ class Container:
         escalation_store: Optional[EscalationStore] = None,
         cases: Optional[CaseStore] = None,
         replay_runs: Optional[ReplayRunStore] = None,
+        tenants: Optional[TenantStore] = None,
+        sources: Optional[SourceStore] = None,
+        drafts: Optional[DraftStore] = None,
     ) -> None:
         self.ledger: LedgerStore = ledger or InMemoryLedgerStore()
         self.bundles: BundleStore = bundles or InMemoryBundleStore()
         self.escalation_store: EscalationStore = escalation_store or InMemoryEscalationStore()
         self.cases: CaseStore = cases or InMemoryCaseStore()
         self.replay_runs: ReplayRunStore = replay_runs or InMemoryReplayRunStore()
+        self.tenant_store: TenantStore = tenants or InMemoryTenantStore()
+        self.source_store: SourceStore = sources or InMemorySourceStore()
+        self.draft_store: DraftStore = drafts or InMemoryDraftStore()
 
         self.decisions = DecisionService(self.ledger)
         self.replay = ReplayEngine(self.replay_runs)
         self.lifecycle = BundleLifecycle(self.bundles, self.replay_runs)
         self.escalations = EscalationService(
             self.escalation_store, self.decisions, self._promote_golden
+        )
+        self.tenants = TenantService(self.tenant_store)
+        self.onboarding = OnboardingService(
+            self.tenants, self.source_store, self.draft_store
         )
 
     # promoted adjudications become golden cases with full provenance
@@ -123,9 +141,12 @@ def _build_container() -> Container:
         from backend.stores_pg import (
             PgBundleStore,
             PgCaseStore,
+            PgDraftStore,
             PgEscalationStore,
             PgLedgerStore,
             PgReplayRunStore,
+            PgSourceStore,
+            PgTenantStore,
         )
 
         schema = os.environ.get("KERNL_DB_SCHEMA", "public")
@@ -135,6 +156,9 @@ def _build_container() -> Container:
             escalation_store=PgEscalationStore(db_url, schema=schema),
             cases=PgCaseStore(db_url, schema=schema),
             replay_runs=PgReplayRunStore(db_url, schema=schema),
+            tenants=PgTenantStore(db_url, schema=schema),
+            sources=PgSourceStore(db_url, schema=schema),
+            drafts=PgDraftStore(db_url, schema=schema),
         )
     return Container()
 

@@ -137,8 +137,9 @@ class ReplayEngine:
         candidate: Bundle,
         reference: Optional[Bundle] = None,
     ) -> ReplayRun:
-        if not cases:
-            raise ValueError("replay requires a non-empty case set")
+        # An empty case set is a valid CLEAN baseline: a tenant's first bundle
+        # has no golden corpus to regress against yet. The run reports zeros and
+        # still requires owner acknowledgement before it can gate a publish.
         results: list[CaseResult] = []
         golden_passed = golden_failed = flips = new_escalations = errors = 0
 

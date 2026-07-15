@@ -1,36 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Kernl Console
 
-## Getting Started
+The V1 "Decision Ledger" console — the operator surface over the `/v1` API.
+Next.js 16 (App Router, Turbopack) / React 19 / Tailwind 4. No mock data: every
+screen reads the real backend, authenticated by a tenant API key.
 
-First, run the development server:
+## Screens
+
+| Route | Purpose |
+|---|---|
+| `/evaluate` | Run a real decision against the active bundle (typed facts or raw JSON; omit a fact to see strict escalation). |
+| `/decisions/[id]` | The trace — the receipt. Every policy considered, per-condition expected/actual, precedence winner, evidence, chain hashes. |
+| `/ledger` | Append-only event browser: filter, chain-verify indicator, CSV/JSON export. |
+| `/escalations` + `/escalations/[id]` | The adjudicator's inbox; resolutions are ledgered adjudications with mandatory rationale + promote-to-golden. |
+| `/replays` + `/replays/[id]` | Blast-radius reports (flips, golden failures) and the publish-gate acknowledgment. |
+| `/policies` | Policy workbench: published bundle with evidence, registry, replay→acknowledge→publish flow, rollback (pointer move). |
+| `/settings` | Session/tenant, system status, workflow fact schemas, extraction drafts (owner). |
+
+## Run
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev      # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Point the console at a running backend via `.env.local`:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+NEXT_PUBLIC_KERNL_API_URL=http://127.0.0.1:8000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Defaults to `http://127.0.0.1:8000` if unset. The API key is entered at `/login`
+and held in `sessionStorage` (cleared when the tab closes); the server enforces
+tenant + role on every request regardless of what the UI offers.
 
-## Learn More
+## Build
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run build
+npm run lint
+```

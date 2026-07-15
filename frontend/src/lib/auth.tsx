@@ -1,124 +1,89 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { useRouter } from "next/navigation";
-import { API_BASE } from "@/lib/api";
+/** API-key auth held client-side. The key lives in sessionStorage (gone when
+ *  the tab closes); the server enforces roles on every endpoint regardless —
+ *  the principal here only gates what the UI offers. */
 
-type AuthConfig = {
-  supabase_url: string;
-  supabase_anon_key: string;
-};
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { getMe } from "./api";
+import type { Principal } from "./types";
 
-type AuthUser = {
-  id: string;
-  email: string;
-};
+const STORAGE_KEY = "kernl.api_key";
 
-type AuthContextType = {
-  user: AuthUser | null;
-  token: string | null;
-  loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
+interface AuthState {
+  apiKey: string | null;
+  principal: Principal | null;
+  /** true until sessionStorage has been consulted (avoids redirect flicker) */
+  ready: boolean;
+  login: (key: string) => Promise<Principal>;
   logout: () => void;
-};
-
-let cachedConfig: AuthConfig | null = null;
-
-async function getAuthConfig(): Promise<AuthConfig> {
-  if (cachedConfig) return cachedConfig;
-  const res = await fetch(`${API_BASE}/auth/config`);
-  cachedConfig = await res.json();
-  return cachedConfig!;
 }
 
-export async function loginWithSupabase(email: string, password: string) {
-  const config = await getAuthConfig();
-  const res = await fetch(`${config.supabase_url}/auth/v1/token?grant_type=password`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: config.supabase_anon_key,
-    },
-    body: JSON.stringify({ email, password }),
-  });
-  if (!res.ok) throw new Error((await res.json()).error_description || "Login failed");
-  const data = await res.json();
-  sessionStorage.setItem("kernl_token", data.access_token);
-  sessionStorage.setItem("kernl_user", JSON.stringify({ id: data.user.id, email: data.user.email }));
-  return data;
-}
+const AuthContext = createContext<AuthState | null>(null);
 
-export async function registerWithSupabase(email: string, password: string) {
-  const config = await getAuthConfig();
-  const res = await fetch(`${config.supabase_url}/auth/v1/signup`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: config.supabase_anon_key,
-    },
-    body: JSON.stringify({ email, password }),
-  });
-  if (!res.ok) throw new Error((await res.json()).msg || "Registration failed");
-  return res.json();
-}
-
-const AuthContext = createContext<AuthContextType | null>(null);
-
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [principal, setPrincipal] = useState<Principal | null>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const savedToken = sessionStorage.getItem("kernl_token");
-    const savedUser = sessionStorage.getItem("kernl_user");
-    if (savedToken && savedUser) {
-      setToken(savedToken);
-      setUser(JSON.parse(savedUser));
+    let cancelled = false;
+    const stored = sessionStorage.getItem(STORAGE_KEY);
+    if (!stored) {
+      // defer to a microtask so the setState is not synchronous in the effect
+      queueMicrotask(() => {
+        if (!cancelled) setReady(true);
+      });
+      return () => {
+        cancelled = true;
+      };
     }
-    setLoading(false);
+    getMe(stored)
+      .then((me) => {
+        if (cancelled) return;
+        setApiKey(stored);
+        setPrincipal(me);
+      })
+      .catch(() => sessionStorage.removeItem(STORAGE_KEY))
+      .finally(() => {
+        if (!cancelled) setReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const data = await loginWithSupabase(email, password);
-    setToken(data.access_token);
-    setUser({ id: data.user.id, email: data.user.email });
-  };
+  const login = useCallback(async (key: string) => {
+    const me = await getMe(key); // throws ApiError(401) on a bad key
+    sessionStorage.setItem(STORAGE_KEY, key);
+    setApiKey(key);
+    setPrincipal(me);
+    return me;
+  }, []);
 
-  const register = async (email: string, password: string) => {
-    await registerWithSupabase(email, password);
-  };
-
-  const logout = () => {
-    sessionStorage.removeItem("kernl_token");
-    sessionStorage.removeItem("kernl_user");
-    setToken(null);
-    setUser(null);
-  };
+  const logout = useCallback(() => {
+    sessionStorage.removeItem(STORAGE_KEY);
+    setApiKey(null);
+    setPrincipal(null);
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ apiKey, principal, ready, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-export function useAuth() {
+export function useAuth(): AuthState {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>");
   return ctx;
 }
 
-export function useProtectedAuth() {
-  const auth = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!auth.loading && !auth.user) {
-      router.push("/login");
-    }
-  }, [auth.loading, auth.user, router]);
-
-  return auth;
+/** Convenience for authenticated screens: non-null key + principal.
+ *  Only call under the console layout guard. */
+export function useSession(): { apiKey: string; principal: Principal } {
+  const { apiKey, principal } = useAuth();
+  if (!apiKey || !principal) throw new Error("useSession outside authenticated area");
+  return { apiKey, principal };
 }

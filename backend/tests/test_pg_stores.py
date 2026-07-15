@@ -58,12 +58,19 @@ from backend.ledger.events import Actor
 from backend.ledger.service import DecisionService
 from backend.replay.cases import Expected, GoldenCase
 from backend.replay.engine import ReplayEngine
+from backend.onboarding.drafts import build_draft
+from backend.onboarding.service import OnboardingService
+from backend.onboarding.sources import make_snapshot
+from backend.onboarding.tenants import Tenant, TenantService
 from backend.stores_pg import (
     PgBundleStore,
     PgCaseStore,
+    PgDraftStore,
     PgEscalationStore,
     PgLedgerStore,
     PgReplayRunStore,
+    PgSourceStore,
+    PgTenantStore,
 )
 
 SCHEMA = f"kernl_test_{uuid.uuid4().hex[:10]}"
@@ -257,6 +264,59 @@ def test_persistence_across_reconnect():
     assert fresh.cases.list(CID)
 
 
+def test_onboarding_stores_full_flow():
+    """Onboarding adapters satisfy the same contract: provision a tenant, issue
+    + resolve a hashed key, snapshot a source, author + ground + accept a draft,
+    and see it all survive a fresh connection."""
+    tenants = TenantService(PgTenantStore(DB_URL, schema=SCHEMA))
+    sources = PgSourceStore(DB_URL, schema=SCHEMA)
+    drafts = PgDraftStore(DB_URL, schema=SCHEMA)
+    svc = OnboardingService(tenants, sources, drafts)
+
+    tenant, key = tenants.provision("pg-onboard-co", "PG Onboard Co")
+    assert tenant.company_id == "pg-onboard-co" and key.startswith("kk_")
+    # hashed key resolves; duplicate tenant rejected
+    assert tenants.resolve(key).role == "owner"
+    try:
+        tenants.provision("pg-onboard-co", "dup")
+        assert False, "duplicate tenant must raise"
+    except ValueError:
+        pass
+
+    source_text = "Annual plans refunded within 14 days receive a full refund."
+    snap = sources.add(make_snapshot("pg-onboard-co", "refund.md", source_text))
+    assert sources.get("pg-onboard-co", snap.source_id).content == source_text
+
+    proposed = {
+        "id": "refund.annual_14d", "workflow": "refund",
+        "effect": {"kind": "approve", "action": "approve_full_refund"},
+        "priority": 70,
+        "conditions": [{"field": "days_since_purchase", "operator": "lte",
+                        "value": 14, "value_type": "number"}],
+        "authority": {"approval_required": False}, "overrides": [],
+        "unconditional_ack": False, "rationale": "x",
+    }
+    d = svc.save_draft("pg-onboard-co", proposed)
+    assert d.publishable is False
+    start = source_text.index("Annual")
+    end = source_text.index("full refund.") + len("full refund.")
+    d = svc.ground_span("pg-onboard-co", d.draft_id, snap.source_id, start, end,
+                        source_text[start:end])
+    assert d.publishable is True
+    svc.set_status("pg-onboard-co", d.draft_id, "accepted")
+
+    # fresh connections see the persisted state, and a bundle assembles
+    fresh = OnboardingService(
+        TenantService(PgTenantStore(DB_URL, schema=SCHEMA)),
+        PgSourceStore(DB_URL, schema=SCHEMA),
+        PgDraftStore(DB_URL, schema=SCHEMA),
+    )
+    accepted = fresh.drafts.list("pg-onboard-co", status="accepted")
+    assert len(accepted) == 1 and accepted[0].evidence_json
+    bundle = fresh.assemble_bundle("pg-onboard-co")
+    assert len(bundle.policies) == 1
+
+
 TESTS = [
     test_ledger_append_idempotency_chain,
     test_history_mutation_blocked_by_database,
@@ -265,6 +325,7 @@ TESTS = [
     test_escalation_resolution_and_promotion,
     test_case_duplicate_rejected,
     test_persistence_across_reconnect,
+    test_onboarding_stores_full_flow,
 ]
 
 

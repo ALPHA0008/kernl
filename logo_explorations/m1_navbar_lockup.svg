@@ -1,0 +1,6 @@
+<svg viewBox="0 0 200 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- M1 navbar lockup: mark + "kernl" wordmark -->
+  <rect x="10" y="10" width="13" height="30" fill="#FFFFFF"/>
+  <rect x="26" y="10" width="5" height="30" fill="#FFFFFF"/>
+  <text x="42" y="32" fill="#FFFFFF" font-family="system-ui, sans-serif" font-size="22" font-weight="bold" letter-spacing="1">kernl</text>
+</svg>

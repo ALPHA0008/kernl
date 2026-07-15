@@ -1,517 +1,248 @@
 @import "tailwindcss";
 
-/* ═══════════════════════════════════════════════
-   KERNL DESIGN SYSTEM — "Aerospace Grade"
-   Glassmorphism × Minimalism × Dark-first
-   ═══════════════════════════════════════════════ */
+/* ============================================================================
+   Kernl Console — design system
+   Strictly derived from DESIGN.md (npx getdesign@latest add vercel).
+   Geist Sans carries display/body/nav; Geist Mono carries technical labels
+   (hashes, facts, code, eyebrows). No off-brand fonts. Geist Pixel is reserved
+   for a future landing page only — not used in the console.
+   ============================================================================ */
 
-:root {
-  /* ── Core Palette ── */
-  --bg-base: #0A0F14;
-  --bg-surface: #111820;
-  --bg-elevated: #19222D;
-  --bg-input: #0C1218;
-  --bg-hover: #1E2A36;
-
-  /* ── Brand Teal ── */
-  --primary: #00D2B4;
-  --primary-hover: #00E8C8;
-  --primary-dim: #00A893;
-  --primary-ghost: rgba(0, 210, 180, 0.08);
-  --primary-glow: rgba(0, 210, 180, 0.15);
-
-  /* ── Text ── */
-  --text-primary: #E8EDF2;
-  --text-secondary: #8899A6;
-  --text-muted: #5C6F7E;
-  --text-inverse: #0A0F14;
-
-  /* ── Borders ── */
-  --border: rgba(255, 255, 255, 0.06);
-  --border-hover: rgba(255, 255, 255, 0.12);
-  --border-active: rgba(0, 210, 180, 0.3);
-
-  /* ── Status ── */
-  --success: #34D399;
-  --success-bg: rgba(52, 211, 153, 0.1);
-  --warning: #FBBF24;
-  --warning-bg: rgba(251, 191, 36, 0.1);
-  --error: #F87171;
-  --error-bg: rgba(248, 113, 113, 0.1);
-  --info: #60A5FA;
-  --info-bg: rgba(96, 165, 250, 0.1);
-
-  /* ── Spacing (8pt grid) ── */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-8: 32px;
-  --space-10: 40px;
-  --space-12: 48px;
-  --space-16: 64px;
-
-  /* ── Radii ── */
-  --radius-sm: 4px;
-  --radius: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-full: 9999px;
-
-  /* ── Sidebar ── */
-  --sidebar-width: 64px;
-
-  /* ── Typography ── */
-  --font-sans: 'Inter', var(--font-geist-sans), system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', var(--font-geist-mono), 'Fira Code', monospace;
-}
-
-/* ── Tailwind Theme Bridge ── */
 @theme inline {
-  --color-background: var(--bg-base);
-  --color-foreground: var(--text-primary);
-  --color-surface: var(--bg-surface);
-  --color-elevated: var(--bg-elevated);
-  --color-primary: var(--primary);
-  --color-primary-hover: var(--primary-hover);
-  --color-primary-dim: var(--primary-dim);
-  --color-primary-ghost: var(--primary-ghost);
-  --color-text-secondary: var(--text-secondary);
-  --color-text-muted: var(--text-muted);
-  --color-border: var(--border);
-  --color-border-hover: var(--border-hover);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-error: var(--error);
-  --color-info: var(--info);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-mono);
+  --font-sans: var(--font-geist-sans), Inter, system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
 
-/* ═══════════════ Global Base ═══════════════ */
+@theme {
+  /* ---- color: Vercel stark ink + gray ladder ---- */
+  --color-ink: #171717;
+  --color-body: #4d4d4d;
+  --color-mute: #888888;
+  --color-hairline: #ebebeb;
+  --color-hairline-strong: #a1a1a1;
+  --color-canvas: #ffffff;
+  --color-canvas-soft: #fafafa;
+  --color-canvas-soft-2: #f5f5f5;
+  --color-on-primary: #ffffff;
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
+  --color-link: #0070f3;
+  --color-link-deep: #0761d1;
+  --color-link-bg-soft: #d3e5ff;
+
+  --color-success: #0070f3;
+  --color-success-fg: #0070f3;
+  --color-error: #ee0000;
+  --color-error-soft: #f7d4d6;
+  --color-error-deep: #c50000;
+  --color-warning: #f5a623;
+  --color-warning-soft: #ffefcf;
+  --color-warning-deep: #ab570a;
+  --color-violet: #7928ca;
+  --color-cyan: #50e3c2;
+  --color-cyan-deep: #29bc9b;
+
+  /* semantic aliases used across the app (map onto the Vercel palette) */
+  --color-approve: #0e7a53;
+  --color-approve-bg: #e7f6ee;
+  --color-deny: #c50000;
+  --color-deny-bg: #f7d4d6;
+  --color-escalate: #ab570a;
+  --color-escalate-bg: #ffefcf;
+  --color-route: #0761d1;
+  --color-route-bg: #d3e5ff;
+
+  /* ---- radius scale (extends Tailwind's; safe suffixes) ---- */
+  --radius-pill: 100px;
+}
+
+/* NOTE: We deliberately do NOT override Tailwind v4's --spacing-* namespace.
+   Defining --spacing-2xl etc. here silently breaks max-w-2xl / w-* / gap-*
+   because they share the same scale keys — which is what wrapped page
+   subtitles one word per line. All spacing uses Tailwind's built-in utilities
+   (px-5, gap-6, max-w-2xl), which map to its default numeric scale. */
+
+/* ---- elevation ladder — a crisp 1px hairline ring + stacked soft shadows.
+   The visible border (not just a soft glow) is what gives Vercel surfaces
+   their "engineered" texture. ---- */
+:root {
+  --ring: 0 0 0 1px rgba(0, 0, 0, 0.09);
+  --shadow-1: var(--ring);
+  --shadow-2: var(--ring), 0px 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-3: var(--ring), 0px 1px 2px rgba(0, 0, 0, 0.04),
+    0px 4px 8px -2px rgba(0, 0, 0, 0.04);
+  --shadow-4: var(--ring), 0px 2px 4px rgba(0, 0, 0, 0.04),
+    0px 12px 24px -6px rgba(0, 0, 0, 0.08);
+  --shadow-5: var(--ring), 0px 2px 4px rgba(0, 0, 0, 0.04),
+    0px 12px 24px -6px rgba(0, 0, 0, 0.08),
+    0px 24px 48px -12px rgba(0, 0, 0, 0.12);
 }
 
 html {
-  scroll-behavior: smooth;
-  color-scheme: dark;
-  background-color: #0A0F14;
+  /* Root 16px = DESIGN.md's default body size (`body-md`). Tailwind's rem
+     utilities (text-sm=14px, text-base=16px, padding, gap) now align exactly
+     with the Vercel scale, so text-base IS the spec's default body. Earlier
+     the console ran on `body-sm` (14px) — the spec's SECONDARY size — which is
+     why everything read cramped. */
+  font-size: 16px;
+  background: var(--color-canvas-soft);
+  color: var(--color-ink);
 }
 
 body {
-  background: #0A0F14 !important;
-  background-color: #0A0F14 !important;
-  color: var(--text-primary);
   font-family: var(--font-sans);
+  font-size: 1rem; /* body-md: 16px default body, per DESIGN.md */
+  line-height: 1.5;
+  letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
-/* ── Selection ── */
 ::selection {
-  background: rgba(0, 210, 180, 0.25);
-  color: #fff;
+  background: var(--color-ink);
+  color: #f2f2f2;
 }
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--border-hover);
-  border-radius: var(--radius-full);
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
-}
-
-/* ═══════════════ Animation Keyframes ═══════════════ */
-
-@keyframes fade-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fade-up {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes slide-in-right {
-  from { opacity: 0; transform: translateX(24px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes slide-in-left {
-  from { opacity: 0; transform: translateX(-24px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 210, 180, 0.2); }
-  50% { box-shadow: 0 0 16px 4px rgba(0, 210, 180, 0.15); }
-}
-
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-@keyframes flow-dots {
-  0% { background-position: 0 0; }
-  100% { background-position: 24px 0; }
-}
-
-/* ═══════════════ Utility Classes ═══════════════ */
-
-.animate-fade-in {
-  animation: fade-in 0.4s ease-out both;
-}
-
-.animate-fade-up {
-  animation: fade-up 0.5s ease-out both;
-}
-
-.animate-slide-right {
-  animation: slide-in-right 0.4s ease-out both;
-}
-
-.animate-pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
-}
-
-.animate-shimmer {
-  background: linear-gradient(90deg, transparent 25%, rgba(255,255,255,0.04) 50%, transparent 75%);
-  background-size: 200% 100%;
-  animation: shimmer 2s linear infinite;
-}
-
-.animate-spin-slow {
-  animation: spin 2s linear infinite;
-}
-
-/* ── Stagger children ── */
-.stagger-children > * {
-  animation: fade-up 0.4s ease-out both;
-}
-.stagger-children > *:nth-child(1) { animation-delay: 0.05s; }
-.stagger-children > *:nth-child(2) { animation-delay: 0.1s; }
-.stagger-children > *:nth-child(3) { animation-delay: 0.15s; }
-.stagger-children > *:nth-child(4) { animation-delay: 0.2s; }
-.stagger-children > *:nth-child(5) { animation-delay: 0.25s; }
-.stagger-children > *:nth-child(6) { animation-delay: 0.3s; }
-
-/* ═══════════════ Component Primitives ═══════════════ */
-
-/* ── Glass Card ── */
-.glass-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  backdrop-filter: blur(12px);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.glass-card:hover {
-  border-color: var(--border-hover);
-}
-
-.glass-card--interactive:hover {
-  border-color: var(--border-active);
-  box-shadow: 0 0 24px -8px rgba(0, 210, 180, 0.08);
-  cursor: pointer;
-}
-
-.glass-card--elevated {
-  background: var(--bg-elevated);
-  border-color: var(--border-hover);
-}
-
-/* ── Gradient Mesh Background ── */
-.mesh-gradient {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background:
-    radial-gradient(ellipse 60% 40% at 20% 80%, rgba(0, 210, 180, 0.04) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 50% at 80% 20%, rgba(96, 165, 250, 0.03) 0%, transparent 60%),
-    radial-gradient(ellipse 40% 60% at 50% 50%, rgba(139, 92, 246, 0.02) 0%, transparent 60%);
-  pointer-events: none;
-}
-
-/* ── Button Styles ── */
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 20px;
-  background: var(--primary);
-  color: var(--text-inverse);
+/* ---- typography utility classes (map 1:1 to DESIGN.md tokens) ---- */
+.t-display-xl {
+  font-size: 48px;
   font-weight: 600;
-  font-size: 14px;
-  border-radius: var(--radius);
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
+  line-height: 48px;
+  letter-spacing: -2.4px;
 }
-
-.btn-primary:hover {
-  background: var(--primary-hover);
-  box-shadow: 0 0 20px -4px rgba(0, 210, 180, 0.3);
-}
-
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  box-shadow: none;
-}
-
-.btn-secondary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 20px;
-  background: transparent;
-  color: var(--text-primary);
+.t-display-lg {
+  font-size: 32px;
   font-weight: 600;
-  font-size: 14px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border-hover);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
+  line-height: 40px;
+  letter-spacing: -1.28px;
 }
-
-.btn-secondary:hover {
-  background: var(--bg-hover);
-  border-color: var(--text-muted);
-}
-
-.btn-ghost {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 20px;
-  background: transparent;
-  color: var(--primary);
-  font-weight: 600;
-  font-size: 14px;
-  border-radius: var(--radius);
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-}
-
-.btn-ghost:hover {
-  background: var(--primary-ghost);
-}
-
-/* ── Input Styles ── */
-.input-field {
-  width: 100%;
-  padding: 10px 14px;
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text-primary);
-  font-size: 14px;
-  font-family: var(--font-sans);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  outline: none;
-}
-
-.input-field::placeholder {
-  color: var(--text-muted);
-}
-
-.input-field:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(0, 210, 180, 0.1);
-}
-
-.input-field--mono {
-  font-family: var(--font-mono);
-  font-size: 13px;
-}
-
-/* ── Label ── */
-.input-label {
-  display: block;
-  font-size: 12px;
-  font-weight: 600;
-  font-family: var(--font-mono);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  margin-bottom: 6px;
-}
-
-/* ── Badge/Chip ── */
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 10px;
-  font-size: 11px;
-  font-weight: 600;
-  font-family: var(--font-mono);
-  letter-spacing: 0.02em;
-  border-radius: var(--radius-sm);
-  white-space: nowrap;
-}
-
-.badge--primary {
-  background: var(--primary-ghost);
-  color: var(--primary);
-  border: 1px solid rgba(0, 210, 180, 0.2);
-}
-
-.badge--success {
-  background: var(--success-bg);
-  color: var(--success);
-  border: 1px solid rgba(52, 211, 153, 0.2);
-}
-
-.badge--warning {
-  background: var(--warning-bg);
-  color: var(--warning);
-  border: 1px solid rgba(251, 191, 36, 0.2);
-}
-
-.badge--error {
-  background: var(--error-bg);
-  color: var(--error);
-  border: 1px solid rgba(248, 113, 113, 0.2);
-}
-
-.badge--info {
-  background: var(--info-bg);
-  color: var(--info);
-  border: 1px solid rgba(96, 165, 250, 0.2);
-}
-
-.badge--neutral {
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-secondary);
-  border: 1px solid var(--border);
-}
-
-/* ── Pipeline Node ── */
-.pipeline-connector {
-  width: 2px;
-  height: 32px;
-  margin: 0 auto;
-  background: linear-gradient(to bottom, var(--primary-dim), var(--border));
-  position: relative;
-}
-
-.pipeline-connector--active {
-  background: var(--primary);
-  box-shadow: 0 0 8px rgba(0, 210, 180, 0.3);
-}
-
-.pipeline-connector--pending {
-  background: var(--border);
-}
-
-/* ── Terminal Log ── */
-.terminal {
-  background: #05070A;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 1.7;
-  overflow-y: auto;
-  padding: var(--space-4);
-}
-
-.terminal-line {
-  display: flex;
-  gap: 8px;
-}
-
-.terminal-time {
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
-
-.terminal-event {
-  color: var(--primary);
-}
-
-.terminal-detail {
-  color: var(--text-secondary);
-}
-
-.terminal-error {
-  color: var(--error);
-}
-
-/* ── Progress Bar ── */
-.progress-bar {
-  height: 6px;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: var(--radius-full);
-  overflow: hidden;
-}
-
-.progress-bar__fill {
-  height: 100%;
-  border-radius: var(--radius-full);
-  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* ── Empty State ── */
-.empty-state {
-  text-align: center;
-  padding: var(--space-16) var(--space-8);
-}
-
-.empty-state__icon {
-  width: 56px;
-  height: 56px;
-  margin: 0 auto var(--space-6);
-  border-radius: var(--radius-md);
-  background: var(--primary-ghost);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--primary);
+.t-display-md {
   font-size: 24px;
+  font-weight: 600;
+  line-height: 32px;
+  letter-spacing: -0.96px;
+}
+.t-display-sm {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 28px;
+  letter-spacing: -0.6px;
+}
+.t-body-lg {
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 28px;
+}
+.t-body-md {
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 24px;
+}
+.t-body-sm {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  letter-spacing: -0.28px;
+}
+.t-caption {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+}
+/* mono eyebrow: the "technical voice" label, per DESIGN.md */
+.t-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 400;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-mute);
 }
 
-/* ═══════════════ Reduced Motion ═══════════════ */
+/* ---- ledger data table (mono-caps header, hairline rows) ---- */
+.table-ledger {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.table-ledger th {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-mute);
+  text-align: left;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-canvas-soft);
+  white-space: nowrap;
+}
+.table-ledger td {
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid var(--color-hairline);
+  vertical-align: middle;
+  font-size: 0.875rem; /* 14px — readable cell default; cells may still opt to mono/xs */
+}
+.table-ledger tbody tr {
+  transition: background 100ms ease;
+}
+.table-ledger tbody tr:hover {
+  background: color-mix(in srgb, var(--color-canvas-soft) 60%, transparent);
+}
+.table-ledger tbody tr:last-child td {
+  border-bottom: none;
+}
 
+/* ---- focus discipline ---- */
+:focus-visible {
+  outline: 2px solid var(--color-link);
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+
+/* ---- skeleton shimmer ---- */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-canvas-soft-2) 25%,
+    #ececec 37%,
+    var(--color-canvas-soft-2) 63%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease infinite;
+  border-radius: var(--radius-sm);
+}
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+  .skeleton {
+    animation: none;
+  }
+}
+
+/* ---- route transition (subtle, purposeful) ---- */
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.page-enter {
+  animation: page-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-enter {
+    animation: none;
   }
 }

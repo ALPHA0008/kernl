@@ -239,3 +239,42 @@ CREATE INDEX IF NOT EXISTS idx_drafts_pending
 
 -- W8 surfacing: compile runs carry visible warnings
 ALTER TABLE compile_runs ADD COLUMN IF NOT EXISTS warnings JSONB;
+
+-- Onboarding: immutable source snapshots that evidence spans cite into ---------
+-- A snapshot is the frozen bytes of an uploaded document. Its content hash is
+-- the source_version an Evidence span references; grounding verifies the
+-- selected span's bytes against this text (rule 2: no uncited norm).
+CREATE TABLE IF NOT EXISTS source_snapshots (
+    source_id     TEXT NOT NULL,                -- content-addressed id (sha256 prefix)
+    company_id    TEXT NOT NULL,
+    filename      TEXT NOT NULL,
+    content_hash  TEXT NOT NULL,                -- sha256 of the raw text bytes
+    content       TEXT NOT NULL,                -- the frozen document text
+    byte_length   INTEGER NOT NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (company_id, source_id)
+);
+CREATE INDEX IF NOT EXISTS idx_sources_company
+    ON source_snapshots(company_id, created_at DESC);
+
+-- Onboarding drafts are richer than the extraction-only policy_drafts table:
+-- they carry the full editable proposed policy plus grounded evidence. Kept as
+-- a separate table so the extraction proposer (policy_drafts) stays untouched.
+CREATE TABLE IF NOT EXISTS onboarding_drafts (
+    draft_id       TEXT NOT NULL,
+    company_id     TEXT NOT NULL,
+    proposed_json  JSONB NOT NULL,              -- full editable Policy-shaped JSON
+    evidence_json  JSONB NOT NULL DEFAULT '[]', -- grounded, verified Evidence spans
+    origin         TEXT NOT NULL DEFAULT 'authored'
+                   CHECK (origin IN ('authored','extracted')),
+    source_skill_id TEXT,                       -- provenance when extracted
+    status         TEXT NOT NULL DEFAULT 'draft'
+                   CHECK (status IN ('draft','accepted','rejected')),
+    publishable    BOOLEAN NOT NULL DEFAULT FALSE,
+    issues_json    JSONB NOT NULL DEFAULT '[]',
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (company_id, draft_id)
+);
+CREATE INDEX IF NOT EXISTS idx_onboarding_drafts
+    ON onboarding_drafts(company_id, status, updated_at DESC);

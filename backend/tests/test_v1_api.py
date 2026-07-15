@@ -62,6 +62,14 @@ def test_auth_required_and_roles_enforced():
                          "rationale": "r"}).status_code == 403
 
 
+def test_me_returns_principal():
+    cl = _client()
+    assert cl.get("/v1/me").status_code == 401
+    me = cl.get("/v1/me", headers=APPROVER).json()
+    assert me == {"company_id": "rivanly-inc", "role": "approver", "key_id": me["key_id"]}
+    assert cl.get("/v1/me", headers=OWNER).json()["role"] == "owner"
+
+
 def test_seeded_bundle_is_active_and_evaluates():
     cl = _client()
     active = cl.get("/v1/bundles/active", headers=AGENT).json()

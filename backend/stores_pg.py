@@ -26,10 +26,13 @@ DIRECT connection string (Dashboard -> Settings -> Database), not the API URL.
 from __future__ import annotations
 
 import json
+import socket
 import threading
+import time
 from typing import Any, Optional
 
 import psycopg
+from psycopg import conninfo as _conninfo_mod
 from psycopg import sql
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
@@ -38,8 +41,55 @@ from backend.bundle.lifecycle import BundleRecord, BundleStatus
 from backend.bundle.schema import Bundle
 from backend.escalation.service import Escalation, EscalationStatus
 from backend.ledger.events import DecisionEvent
+from backend.onboarding.drafts import OnboardingDraft
+from backend.onboarding.sources import SourceSnapshot
+from backend.onboarding.tenants import ApiKeyRecord, Tenant
 from backend.replay.cases import GoldenCase
 from backend.replay.engine import ReplayRun
+
+# Fail a connection attempt fast instead of letting a request hang, and keep
+# idle connections alive through NAT/pooler timeouts.
+_CONNECT_DEFAULTS = {
+    "connect_timeout": "10",
+    "keepalives": "1",
+    "keepalives_idle": "30",
+    "keepalives_interval": "10",
+    "keepalives_count": "5",
+}
+
+
+def _resolve_hostaddr(conninfo: str, *, attempts: int = 5) -> str:
+    """Resolve the host to an IP ONCE and pin it via `hostaddr`, so per-request
+    DNS never happens (some networks resolve Supabase's pooler intermittently).
+    The hostname is kept for TLS SNI / cert validation. Adds sane connect and
+    keepalive timeouts. Best-effort: if resolution fails, returns the original
+    conninfo unchanged so libpq can try its own resolution."""
+    try:
+        params = _conninfo_mod.conninfo_to_dict(conninfo)
+    except Exception:
+        return conninfo
+    host = params.get("host")
+    if not host or params.get("hostaddr"):
+        return conninfo  # nothing to resolve, or already pinned
+
+    port = int(params.get("port") or 5432)
+    last_exc: Optional[Exception] = None
+    for i in range(attempts):
+        try:
+            infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+            # prefer IPv4 (this machine has no IPv6 route to Supabase)
+            ipv4 = [ai[4][0] for ai in infos if ai[0] == socket.AF_INET]
+            addr = ipv4[0] if ipv4 else infos[0][4][0]
+            params["hostaddr"] = addr
+            for k, v in _CONNECT_DEFAULTS.items():
+                params.setdefault(k, v)
+            return _conninfo_mod.make_conninfo(**params)
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            time.sleep(0.5 * (i + 1))
+    raise RuntimeError(
+        f"could not resolve database host {host!r} after {attempts} attempts: {last_exc}"
+    )
 
 
 class _Pg:
@@ -47,7 +97,9 @@ class _Pg:
     every public operation runs in its own transaction."""
 
     def __init__(self, conninfo: str, schema: str = "public") -> None:
-        self._conninfo = conninfo
+        # Resolve + pin the host address once at construction (with retries),
+        # so later reconnects never depend on flaky DNS.
+        self._conninfo = _resolve_hostaddr(conninfo)
         self._schema = schema
         self._lock = threading.Lock()
         self._conn: Optional[psycopg.Connection] = None
@@ -567,3 +619,228 @@ class PgReplayRunStore(_Pg):
                 (company_id, limit),
             )
             return [self._from_row(r) for r in cur.fetchall()]
+
+
+# --------------------------------------------------------------- onboarding
+
+
+class PgTenantStore(_Pg):
+    def add_tenant(self, tenant: Tenant) -> Tenant:
+        with self._tx() as conn, conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM companies WHERE id = %s", (tenant.company_id,))
+            if cur.fetchone() is not None:
+                raise ValueError(f"tenant {tenant.company_id!r} already exists")
+            cur.execute(
+                "INSERT INTO companies (id, name, created_at) VALUES (%s, %s, now())",
+                (tenant.company_id, tenant.name),
+            )
+            cur.execute(
+                "SELECT id, name, created_at FROM companies WHERE id = %s",
+                (tenant.company_id,),
+            )
+            r = cur.fetchone()
+            return Tenant(
+                company_id=r["id"], name=r["name"], created_at=r["created_at"].isoformat()
+            )
+
+    def get_tenant(self, company_id: str) -> Optional[Tenant]:
+        with self._tx() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, name, created_at FROM companies WHERE id = %s", (company_id,)
+            )
+            r = cur.fetchone()
+            if r is None:
+                return None
+            return Tenant(
+                company_id=r["id"], name=r["name"], created_at=r["created_at"].isoformat()
+            )
+
+    def list_tenants(self) -> list[Tenant]:
+        with self._tx() as conn, conn.cursor() as cur:
+            cur.execute("SELECT id, name, created_at FROM companies ORDER BY created_at")
+            return [
+                Tenant(company_id=r["id"], name=r["name"], created_at=r["created_at"].isoformat())
+                for r in cur.fetchall()
+            ]
+
+    def add_key(self, record: ApiKeyRecord) -> ApiKeyRecord:
+        with self._tx() as conn, conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO api_keys (key_id, key_hash, company_id, role, created_at)"
+                " VALUES (%s, %s, %s, %s, now())",
+                (record.key_id, record.key_hash, record.company_id, record.role),
+            )
+            cur.execute(
+                "SELECT key_id, key_hash, company_id, role, created_at, revoked_at"
+                " FROM api_keys WHERE key_id = %s",
+                (record.key_id,),
+            )
+            return _key_from_row(cur.fetchone())
+
+    def find_by_hash(self, key_hash: str) -> Optional[ApiKeyRecord]:
+        with self._tx() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT key_id, key_hash, company_id, role, created_at, revoked_at"
+                " FROM api_keys WHERE key_hash = %s AND revoked_at IS NULL",
+                (key_hash,),
+            )
+            r = cur.fetchone()
+            return _key_from_row(r) if r else None
+
+    def list_keys(self, company_id: str) -> list[ApiKeyRecord]:
+        with self._tx() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT key_id, key_hash, company_id, role, created_at, revoked_at"
+                " FROM api_keys WHERE company_id = %s ORDER BY created_at",
+                (company_id,),
+            )
+            return [_key_from_row(r) for r in cur.fetchall()]
+
+
+def _key_from_row(r: dict[str, Any]) -> ApiKeyRecord:
+    return ApiKeyRecord(
+        key_id=r["key_id"],
+        key_hash=r["key_hash"],
+        company_id=r["company_id"],
+        role=r["role"],
+        created_at=r["created_at"].isoformat() if r["created_at"] else "",
+        revoked_at=r["revoked_at"].isoformat() if r["revoked_at"] else None,
+    )
+
+
+class PgSourceStore(_Pg):
+    def add(self, snapshot: SourceSnapshot) -> SourceSnapshot:
+        with self._tx() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT source_id FROM source_snapshots"
+                " WHERE company_id = %s AND source_id = %s",
+                (snapshot.company_id, snapshot.source_id),
+            )
+            if cur.fetchone() is not None:
+                return self.get(snapshot.company_id, snapshot.source_id)  # type: ignore[return-value]
+            cur.execute(
+                "INSERT INTO source_snapshots (source_id, company_id, filename,"
+                " content_hash, content, byte_length, created_at)"
+                " VALUES (%s, %s, %s, %s, %s, %s, now())",
+                (
+                    snapshot.source_id,
+                    snapshot.company_id,
+                    snapshot.filename,
+                    snapshot.content_hash,
+                    snapshot.content,
+                    snapshot.byte_length,
+                ),
+            )
+        return self.get(snapshot.company_id, snapshot.source_id)  # type: ignore[return-value]
+
+    def get(self, company_id: str, source_id: str) -> Optional[SourceSnapshot]:
+        with self._tx() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT * FROM source_snapshots WHERE company_id = %s AND source_id = %s",
+                (company_id, source_id),
+            )
+            r = cur.fetchone()
+            return _snapshot_from_row(r) if r else None
+
+    def list(self, company_id: str) -> list[SourceSnapshot]:
+        with self._tx() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT * FROM source_snapshots WHERE company_id = %s"
+                " ORDER BY created_at DESC",
+                (company_id,),
+            )
+            return [_snapshot_from_row(r) for r in cur.fetchall()]
+
+
+def _snapshot_from_row(r: dict[str, Any]) -> SourceSnapshot:
+    return SourceSnapshot(
+        source_id=r["source_id"],
+        company_id=r["company_id"],
+        filename=r["filename"],
+        content_hash=r["content_hash"],
+        content=r["content"],
+        byte_length=r["byte_length"],
+        created_at=r["created_at"].isoformat() if r["created_at"] else "",
+    )
+
+
+class PgDraftStore(_Pg):
+    def upsert(self, draft: OnboardingDraft) -> OnboardingDraft:
+        with self._tx() as conn, conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO onboarding_drafts (draft_id, company_id, proposed_json,"
+                " evidence_json, origin, source_skill_id, status, publishable,"
+                " issues_json, created_at, updated_at)"
+                " VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,"
+                " COALESCE(%s::timestamptz, now()), now())"
+                " ON CONFLICT (company_id, draft_id) DO UPDATE SET"
+                " proposed_json = EXCLUDED.proposed_json,"
+                " evidence_json = EXCLUDED.evidence_json,"
+                " origin = EXCLUDED.origin,"
+                " source_skill_id = EXCLUDED.source_skill_id,"
+                " status = EXCLUDED.status,"
+                " publishable = EXCLUDED.publishable,"
+                " issues_json = EXCLUDED.issues_json,"
+                " updated_at = now()",
+                (
+                    draft.draft_id,
+                    draft.company_id,
+                    Jsonb(draft.proposed_json),
+                    Jsonb(list(draft.evidence_json)),
+                    draft.origin,
+                    draft.source_skill_id,
+                    draft.status,
+                    draft.publishable,
+                    Jsonb(list(draft.issues_json)),
+                    draft.created_at or None,
+                ),
+            )
+        return self.get(draft.company_id, draft.draft_id)  # type: ignore[return-value]
+
+    def get(self, company_id: str, draft_id: str) -> Optional[OnboardingDraft]:
+        with self._tx() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT * FROM onboarding_drafts WHERE company_id = %s AND draft_id = %s",
+                (company_id, draft_id),
+            )
+            r = cur.fetchone()
+            return _draft_from_row(r) if r else None
+
+    def list(self, company_id: str, status: Optional[str] = None) -> list[OnboardingDraft]:
+        with self._tx() as conn, conn.cursor() as cur:
+            if status is None:
+                cur.execute(
+                    "SELECT * FROM onboarding_drafts WHERE company_id = %s"
+                    " ORDER BY updated_at DESC",
+                    (company_id,),
+                )
+            else:
+                cur.execute(
+                    "SELECT * FROM onboarding_drafts WHERE company_id = %s AND status = %s"
+                    " ORDER BY updated_at DESC",
+                    (company_id, status),
+                )
+            return [_draft_from_row(r) for r in cur.fetchall()]
+
+    def delete(self, company_id: str, draft_id: str) -> None:
+        with self._tx() as conn, conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM onboarding_drafts WHERE company_id = %s AND draft_id = %s",
+                (company_id, draft_id),
+            )
+
+
+def _draft_from_row(r: dict[str, Any]) -> OnboardingDraft:
+    return OnboardingDraft(
+        draft_id=r["draft_id"],
+        company_id=r["company_id"],
+        proposed_json=r["proposed_json"],
+        evidence_json=tuple(r["evidence_json"] or ()),
+        origin=r["origin"],
+        source_skill_id=r["source_skill_id"],
+        status=r["status"],
+        publishable=r["publishable"],
+        issues_json=tuple(r["issues_json"] or ()),
+        created_at=r["created_at"].isoformat() if r["created_at"] else "",
+        updated_at=r["updated_at"].isoformat() if r["updated_at"] else "",
+    )

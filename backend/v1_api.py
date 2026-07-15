@@ -16,6 +16,7 @@ Endpoints (all under /v1, all tenant-scoped by API key):
     GET  /v1/escalations[/{id}]        the inbox
     POST /v1/escalations/{id}/resolve  adjudicate (ledgered)
     GET  /v1/cases                     golden case corpus
+    GET  /v1/me                        principal introspection (tenant + role)
     GET  /v1/health
 
 AUTH: X-API-Key header. Keys come from the KERNL_API_KEYS env var:
@@ -76,9 +77,30 @@ def _parse_keys() -> dict[str, Principal]:
     return keys
 
 
+def _resolve_principal(x_api_key: Optional[str], c: Container) -> Optional[Principal]:
+    """Resolve a key from BOTH sources: the static KERNL_API_KEYS env (bootstrap
+    keys) and the tenant store (keys issued by onboarding, stored hashed). Env
+    keys win if both define the same key. Onboarding-issued keys let a brand-new
+    tenant use the console the moment it is provisioned."""
+    if not x_api_key:
+        return None
+    env_principal = _parse_keys().get(x_api_key)
+    if env_principal is not None:
+        return env_principal
+    record = c.tenants.resolve(x_api_key)
+    if record is not None:
+        return Principal(
+            company_id=record.company_id, role=record.role, key_id=record.key_id
+        )
+    return None
+
+
 def require(min_role: str):
-    def dep(x_api_key: Optional[str] = Header(default=None)) -> Principal:
-        principal = _parse_keys().get(x_api_key or "")
+    def dep(
+        x_api_key: Optional[str] = Header(default=None),
+        c: Container = Depends(get_container),
+    ) -> Principal:
+        principal = _resolve_principal(x_api_key, c)
         if principal is None:
             raise HTTPException(status_code=401, detail="invalid or missing API key")
         if ROLE_RANK[principal.role] < ROLE_RANK[min_role]:
@@ -112,6 +134,33 @@ class DraftRequest(BaseModel):
 class ReplayRequest(BaseModel):
     candidate_record_id: str
     include_reference: bool = True
+
+
+class ProvisionRequest(BaseModel):
+    company_id: str = Field(min_length=2, max_length=64, pattern=r"^[a-z0-9][a-z0-9-]*$")
+    name: str = Field(min_length=1, max_length=200)
+
+
+class SourceUploadRequest(BaseModel):
+    filename: str = Field(min_length=1, max_length=256)
+    content: str = Field(min_length=1)
+
+
+class DraftSaveRequest(BaseModel):
+    proposed: dict[str, Any]  # Policy-shaped JSON (editable)
+    draft_id: Optional[str] = None
+    origin: str = "authored"
+
+
+class GroundRequest(BaseModel):
+    source_id: str
+    span_start: int = Field(ge=0)
+    span_end: int = Field(ge=0)
+    excerpt: str = Field(min_length=1)
+
+
+class DraftStatusRequest(BaseModel):
+    status: str  # "accepted" | "rejected" | "draft"
 
 
 # ---------------------------------------------------------------------------
@@ -280,9 +329,10 @@ def run_replay(
     record = c.bundles.get(p.company_id, req.candidate_record_id)
     if record is None:
         raise HTTPException(status_code=404, detail="unknown bundle record")
+    # A tenant's FIRST bundle has no golden corpus yet: an empty replay is a
+    # legitimate clean run (nothing to regress against). The gate still applies
+    # -- an owner must acknowledge the (empty) blast radius before publishing.
     cases = c.cases.list(p.company_id)
-    if not cases:
-        raise HTTPException(status_code=409, detail="no golden cases for tenant")
     reference = None
     if req.include_reference:
         active = c.lifecycle.active_bundle(p.company_id)
@@ -428,7 +478,254 @@ def list_drafts(
 
 
 # ---------------------------------------------------------------------------
+# onboarding: provision -> upload -> author/ground -> assemble -> publish
+
+
+def require_admin(x_api_key: Optional[str] = Header(default=None)) -> str:
+    """Provisioning a brand-new tenant needs a bootstrap credential, because a
+    new tenant has no key yet. KERNL_ADMIN_KEY gates it; if unset, provisioning
+    is closed (never open)."""
+    admin = os.environ.get("KERNL_ADMIN_KEY", "")
+    if not admin or x_api_key != admin:
+        raise HTTPException(status_code=401, detail="admin key required to provision tenants")
+    return x_api_key
+
+
+@router.post("/tenants")
+def provision_tenant(
+    req: ProvisionRequest,
+    _admin: str = Depends(require_admin),
+    c: Container = Depends(get_container),
+):
+    """Create a tenant and issue its first owner key. The plaintext key is
+    returned ONCE here and never again -- the store keeps only its hash."""
+    try:
+        tenant, key = c.tenants.provision(req.company_id, req.name)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {
+        "company_id": tenant.company_id,
+        "name": tenant.name,
+        "owner_api_key": key,  # shown once; store it now
+    }
+
+
+@router.get("/tenants")
+def list_tenants(
+    _admin: str = Depends(require_admin),
+    c: Container = Depends(get_container),
+):
+    return {
+        "tenants": [
+            {"company_id": t.company_id, "name": t.name, "created_at": t.created_at}
+            for t in c.tenant_store.list_tenants()
+        ]
+    }
+
+
+@router.post("/sources")
+def upload_source(
+    req: SourceUploadRequest,
+    p: Principal = Depends(require("owner")),
+    c: Container = Depends(get_container),
+):
+    """Store an immutable, content-addressed snapshot of a document. Evidence
+    spans will cite into it; the bytes are frozen so citations stay verifiable."""
+    from backend.onboarding.sources import make_snapshot
+
+    snap = c.source_store.add(make_snapshot(p.company_id, req.filename, req.content))
+    return {
+        "source_id": snap.source_id,
+        "filename": snap.filename,
+        "content_hash": snap.content_hash,
+        "byte_length": snap.byte_length,
+        "created_at": snap.created_at,
+    }
+
+
+@router.get("/sources")
+def list_sources(
+    p: Principal = Depends(require("agent")),
+    c: Container = Depends(get_container),
+):
+    return {
+        "sources": [
+            {
+                "source_id": s.source_id,
+                "filename": s.filename,
+                "content_hash": s.content_hash,
+                "byte_length": s.byte_length,
+                "created_at": s.created_at,
+            }
+            for s in c.source_store.list(p.company_id)
+        ]
+    }
+
+
+@router.get("/sources/{source_id}")
+def get_source(
+    source_id: str,
+    p: Principal = Depends(require("agent")),
+    c: Container = Depends(get_container),
+):
+    """The full source text -- the reviewer highlights within it to ground a
+    citation, so the client needs the exact bytes to compute span offsets."""
+    snap = c.source_store.get(p.company_id, source_id)
+    if snap is None:
+        raise HTTPException(status_code=404, detail="source not found")
+    return snap.model_dump(mode="json")
+
+
+@router.post("/onboarding/extract")
+async def extract_drafts(
+    req: dict,
+    p: Principal = Depends(require("owner")),
+    c: Container = Depends(get_container),
+):
+    """LLM-propose policy drafts from an uploaded source. Each proposal lands as
+    an ungrounded 'extracted' draft the reviewer must still cite. 503 if the LLM
+    backend is unavailable -- the author-directly path never depends on it."""
+    from backend.onboarding.extract import ExtractionUnavailable, propose_drafts_from_source
+
+    source_id = req.get("source_id")
+    if not source_id:
+        raise HTTPException(status_code=400, detail="source_id is required")
+    snap = c.source_store.get(p.company_id, source_id)
+    if snap is None:
+        raise HTTPException(status_code=404, detail="source not found")
+    try:
+        drafts = await propose_drafts_from_source(snap)
+    except ExtractionUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    stored = [c.draft_store.upsert(d) for d in drafts]
+    return {"drafts": [d.model_dump(mode="json") for d in stored]}
+
+
+@router.get("/onboarding/drafts")
+def list_onboarding_drafts(
+    status: Optional[str] = None,
+    p: Principal = Depends(require("owner")),
+    c: Container = Depends(get_container),
+):
+    return {
+        "drafts": [d.model_dump(mode="json") for d in c.draft_store.list(p.company_id, status)]
+    }
+
+
+@router.get("/onboarding/drafts/{draft_id}")
+def get_onboarding_draft(
+    draft_id: str,
+    p: Principal = Depends(require("owner")),
+    c: Container = Depends(get_container),
+):
+    d = c.draft_store.get(p.company_id, draft_id)
+    if d is None:
+        raise HTTPException(status_code=404, detail="draft not found")
+    return d.model_dump(mode="json")
+
+
+@router.post("/onboarding/drafts")
+def save_onboarding_draft(
+    req: DraftSaveRequest,
+    p: Principal = Depends(require("owner")),
+    c: Container = Depends(get_container),
+):
+    """Create or update a draft's proposed policy. Evidence already grounded on
+    an existing draft is preserved; publishability is re-evaluated."""
+    d = c.onboarding.save_draft(
+        p.company_id, req.proposed, origin=req.origin, draft_id=req.draft_id
+    )
+    return d.model_dump(mode="json")
+
+
+@router.post("/onboarding/drafts/{draft_id}/ground")
+def ground_draft(
+    draft_id: str,
+    req: GroundRequest,
+    p: Principal = Depends(require("owner")),
+    c: Container = Depends(get_container),
+):
+    """Attach a VERIFIED source span as evidence. The span's bytes must exactly
+    match the source at those offsets, or this is a 400 -- no uncited norm."""
+    from backend.onboarding.sources import GroundingError
+
+    try:
+        d = c.onboarding.ground_span(
+            p.company_id, draft_id, req.source_id, req.span_start, req.span_end, req.excerpt
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except GroundingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return d.model_dump(mode="json")
+
+
+@router.delete("/onboarding/drafts/{draft_id}/evidence/{index}")
+def remove_draft_evidence(
+    draft_id: str,
+    index: int,
+    p: Principal = Depends(require("owner")),
+    c: Container = Depends(get_container),
+):
+    try:
+        d = c.onboarding.remove_evidence(p.company_id, draft_id, index)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return d.model_dump(mode="json")
+
+
+@router.post("/onboarding/drafts/{draft_id}/status")
+def set_draft_status(
+    draft_id: str,
+    req: DraftStatusRequest,
+    p: Principal = Depends(require("owner")),
+    c: Container = Depends(get_container),
+):
+    try:
+        d = c.onboarding.set_status(p.company_id, draft_id, req.status)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return d.model_dump(mode="json")
+
+
+@router.post("/onboarding/assemble")
+def assemble_onboarding_bundle(
+    p: Principal = Depends(require("owner")),
+    c: Container = Depends(get_container),
+):
+    """Assemble all accepted drafts into a Bundle and register it as a DRAFT
+    bundle record. It still goes through the normal replay gate before it can
+    publish -- onboarding does not bypass the gate."""
+    from backend.onboarding.service import AssembleError
+
+    try:
+        bundle = c.onboarding.assemble_bundle(p.company_id)
+    except AssembleError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    record = c.lifecycle.save_draft(p.company_id, bundle, created_by=p.key_id)
+    return {
+        "record_id": record.record_id,
+        "content_hash": record.content_hash,
+        "status": record.status.value,
+        "policy_count": len(bundle.policies),
+        "workflow_count": len(bundle.workflows),
+    }
+
+
+# ---------------------------------------------------------------------------
 # cases + health
+
+
+@router.get("/me")
+def whoami(p: Principal = Depends(require("agent"))):
+    """Principal introspection: which tenant + role this key carries. The
+    console uses it to validate a key at login and gate UI actions (the
+    server still enforces roles on every endpoint regardless)."""
+    return {"company_id": p.company_id, "role": p.role, "key_id": p.key_id}
 
 
 @router.get("/cases")
