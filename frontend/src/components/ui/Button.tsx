@@ -15,7 +15,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
  *  Full hover/active/focus/disabled/loading states. */
 const VARIANTS: Record<Variant, string> = {
   primary:
-    "bg-ink text-on-primary shadow-[0_1px_2px_rgba(0,0,0,0.12)] hover:bg-[#333] active:bg-black disabled:bg-mute disabled:shadow-none",
+    "bg-ink text-on-primary shadow-[0_1px_2px_rgba(0,0,0,0.12)] hover:bg-[color:var(--color-ink-hover)] active:bg-[color:var(--color-ink-active)] disabled:bg-mute disabled:shadow-none",
   secondary:
     "bg-canvas text-ink shadow-[var(--shadow-1)] hover:bg-canvas-soft active:bg-canvas-soft-2",
   ghost: "bg-transparent text-body hover:bg-canvas-soft hover:text-ink",
