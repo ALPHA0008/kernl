@@ -41,6 +41,7 @@ from backend.replay.cases import CaseStore, Expected, GoldenCase, InMemoryCaseSt
 from backend.replay.engine import InMemoryReplayRunStore, ReplayEngine, ReplayRunStore
 
 SEED_ENV = "KERNL_SEED_RIVANLY"
+SEED_HIGGSFIELD_ENV = "KERNL_SEED_HIGGSFIELD"
 
 
 class Container:
@@ -99,26 +100,44 @@ class Container:
         real replay gate. Raises if the seed fails its own golden set."""
         from backend.bundle.seed_rivanly import COMPANY_ID, build_bundle, build_golden_cases
 
-        if self.lifecycle.active_bundle(COMPANY_ID) is not None:
-            return
-        bundle = build_bundle()
+        self._seed_reference_bundle(COMPANY_ID, build_bundle, build_golden_cases)
+
+    def seed_higgsfield(self) -> None:
+        """Idempotent: registers + publishes the second reference bundle
+        [synthetic] the same way seed_rivanly does. Raises if the seed fails
+        its own golden set."""
+        from backend.bundle.seed_higgsfield import COMPANY_ID, build_bundle, build_golden_cases
+
+        self._seed_reference_bundle(COMPANY_ID, build_bundle, build_golden_cases)
+
+    def _seed_reference_bundle(self, company_id, build_bundle, build_golden_cases) -> None:
+        """Case-seeding and bundle-publishing are deliberately decoupled: new
+        golden cases (grown, e.g., by re-running this codebase's own seed
+        module after adding cases) are additive corpus data, not history --
+        adding one after the bundle is already published doesn't touch the
+        immutable bundle at all, so it's always safe to attempt. Publishing
+        is still idempotent-by-early-return: never re-publish an already
+        active bundle."""
         for case in build_golden_cases():
             try:
                 self.cases.add(case)
             except ValueError:
                 pass  # already seeded
-        draft = self.lifecycle.save_draft(COMPANY_ID, bundle, created_by="seed")
+        if self.lifecycle.active_bundle(company_id) is not None:
+            return
+        bundle = build_bundle()
+        draft = self.lifecycle.save_draft(company_id, bundle, created_by="seed")
         run = self.replay.run(
-            company_id=COMPANY_ID, cases=self.cases.list(COMPANY_ID), candidate=bundle
+            company_id=company_id, cases=self.cases.list(company_id), candidate=bundle
         )
         if run.summary.golden_failed or run.summary.errors:
             raise RuntimeError(
-                f"seed bundle fails its own golden set "
+                f"seed bundle for {company_id!r} fails its own golden set "
                 f"({run.summary.golden_failed} failed, {run.summary.errors} errors) "
                 "-- refusing to publish"
             )
-        self.replay.acknowledge(COMPANY_ID, run.run_id, by="seed")
-        self.lifecycle.publish(COMPANY_ID, draft.record_id, published_by="seed")
+        self.replay.acknowledge(company_id, run.run_id, by="seed")
+        self.lifecycle.publish(company_id, draft.record_id, published_by="seed")
 
 
 _container: Optional[Container] = None
@@ -171,6 +190,8 @@ def get_container() -> Container:
                 c = _build_container()
                 if os.environ.get(SEED_ENV, "1") == "1":
                     c.seed_rivanly()
+                if os.environ.get(SEED_HIGGSFIELD_ENV, "1") == "1":
+                    c.seed_higgsfield()
                 _container = c
     return _container
 

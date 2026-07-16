@@ -29,7 +29,7 @@ The V1 Decision Ledger backend exists and is fully tested (115/115: 108 across 8
 - **`backend/escalation/`** — inbox lifecycle; resolutions are ledgered adjudications; promote-to-golden closes the precedent loop.
 - **`backend/replay/`** — golden-case + reference-bundle replay with flip/new-escalation reporting; the publish gate.
 - **`backend/v1_api.py` + `v1_container.py`** — /v1 REST surface, API-key auth (owner/approver/agent), tenant isolation, 503-never-fallback.
-- **Seed:** `backend/bundle/seed_rivanly.py` — 22 authored policies across 9 workflows, every evidence span verified against source bytes; 45 migrated golden cases pass 100% `[synthetic]`.
+- **Seed:** `backend/bundle/seed_rivanly.py` — 22 authored policies across 9 workflows, every evidence span verified against source bytes; 58 golden cases pass 100% `[synthetic]`. Second corpus `backend/bundle/seed_higgsfield.py` — 8 authored policies (refund workflow), 15 golden cases pass 100% `[synthetic]`.
 - **Persistence (LIVE):** `backend/stores_pg.py` — five psycopg3 adapters over Supabase Postgres (session pooler); append-only enforced by DB trigger; per-company advisory-lock chain appends; `KERNL_DB_URL` set → Postgres, unset → in-memory reference stores. Contract suite (`backend/tests/test_pg_stores.py`) runs against the real DB in a throwaway schema. Restart-persistence verified: bundle, ledger chain, and idempotency survive process death.
 - **Extraction demoted (Step 6 done):** `backend/bundle/converter.py` — skills → policy *drafts* only, never publishable without verified spans; W8 warnings surfaced; legacy `/agent/*` endpoints retired (410).
 

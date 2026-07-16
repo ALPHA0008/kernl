@@ -133,7 +133,7 @@ The app **runs without Postgres** — `KERNL_DB_URL` unset means the container f
 
 For real persistence: run `backend/schema.sql` against your Postgres instance (17 `CREATE TABLE` statements as of 2026-07-16 — the original 7-table legacy schema plus the V1 bundle/ledger/escalation/replay tables). Then set `KERNL_DB_URL` in `backend/.env`.
 
-Seed data ships in the repo: `data/sources/rivanly-inc/` (used by `backend/bundle/seed_rivanly.py` — 22 authored policies, 45 golden cases) and `data/sources/higgsfield/` (raw docs only, not yet seeded into a bundle — see `kernl-validation-and-qa` for corpus status).
+Seed data ships in the repo: `data/sources/rivanly-inc/` (used by `backend/bundle/seed_rivanly.py` — 22 authored policies, 58 golden cases) and `data/sources/higgsfield/` (used by `backend/bundle/seed_higgsfield.py` — 8 authored policies scoped to the refund workflow, 15 golden cases — see `kernl-validation-and-qa` for corpus status and remaining scope).
 
 ---
 

@@ -587,4 +587,50 @@ def build_golden_cases() -> list[GoldenCase]:
         _case("OPS-SMALL", "vendor", {"invoice_amount": 900, "vendor_type": "software"},
               "escalate", reason="no_matching_policy",
               notes="NEW: sub-$3,500 invoices are not covered by the Slack precedent"),
+        # ---- corpus expansion 2026-07-16: sla/churn/onboarding/hiring/vendor
+        # boundary + precedence coverage, against already-verified policies
+        # (no new evidence needed -- new fact combinations only).
+        _case("SLA-01", "sla", {"customer_type": "enterprise", "sla_breach_hours": 2},
+              "route", "notify_am_and_eng_lead",
+              notes="both sla policies match at this boundary; enterprise rule wins "
+                    "on specificity (2 conditions vs 1)"),
+        _case("SLA-02", "sla", {"customer_type": "enterprise", "sla_breach_hours": 1.5},
+              "route", "notify_support_lead",
+              notes="enterprise condition fails cleanly (1.5 < 2 breach threshold); "
+                    "standard rule fires instead -- distinguishes 'enterprise' from "
+                    "'enterprise AND breach severe enough'"),
+        _case("SLA-03", "sla", {"customer_type": "smb", "sla_breach_hours": 1},
+              "escalate", reason="no_matching_policy",
+              notes="both conditions present and cleanly false (smb != enterprise; "
+                    "1 is not > 1) -- a real gap, not a missing-fact case"),
+        _case("CHURN-05", "churn", {"churn_signals_count": 3},
+              "route", "schedule_am_call", notes="boundary: 3 inclusive (gte)"),
+        _case("CHURN-06", "churn", {"churn_signals_count": 0},
+              "route", "monitor"),
+        _case("ONBOARD-02", "onboarding",
+              {"customer_type": "enterprise", "status": "existing"},
+              "escalate", reason="no_matching_policy",
+              notes="enterprise but not 'new' -- both conditions must hold (AND)"),
+        _case("ONBOARD-03", "onboarding", {"customer_type": "smb", "status": "new"},
+              "escalate", reason="no_matching_policy",
+              notes="the playbook's kickoff rule is enterprise-only; smb onboarding "
+                    "is a documented gap"),
+        _case("HIRING-02", "hiring", {"role": "engineering", "stage": "screening"},
+              "escalate", reason="no_matching_policy",
+              notes="engineering role but not yet at offer stage"),
+        _case("HIRING-03", "hiring", {"role": "sales", "stage": "offer"},
+              "escalate", reason="no_matching_policy",
+              notes="the founder gate is engineering-only; sales offers are a "
+                    "documented gap"),
+        _case("PERF-02", "performance", {"missed_kpi_quarters": 1},
+              "escalate", reason="no_matching_policy",
+              notes="below the 2-quarter PIP threshold"),
+        _case("VENDOR-02", "vendor",
+              {"vendor_type": "software", "invoice_amount": 3500},
+              "route", "route_to_ops_lead", notes="boundary: 3500 inclusive (gte)"),
+        _case("VENDOR-03", "vendor",
+              {"vendor_type": "hardware", "invoice_amount": 5000},
+              "escalate", reason="no_matching_policy",
+              notes="the ops Slack precedent only covers software vendors -- "
+                    "hardware invoices are a documented gap regardless of amount"),
     ]

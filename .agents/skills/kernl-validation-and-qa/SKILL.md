@@ -60,9 +60,9 @@ Run with the rest of tier 1. If you touch `backend/runtime/evaluator.py`, this i
 
 ## 4. Golden case corpus — real status and gaps
 
-As of 2026-07-16: **45 golden cases, all in the `rivanly-inc` corpus, all `[synthetic]`** (i.e., authored test fixtures, not real customer decisions — see `data/sources/rivanly-inc/`). The `higgsfield` corpus (`data/sources/higgsfield/`) has raw source docs but **no seeded bundle and no golden cases at all**.
+As of 2026-07-16: **73 golden cases across two corpora** — `rivanly-inc` (58 cases, 22 policies across 9 workflows) and `higgsfield` (15 cases, 8 policies scoped to the refund workflow — narrower coverage than rivanly by design, see `backend/bundle/seed_higgsfield.py`'s module docstring for scope). All `[synthetic]` except one real adjudication-promoted case in `rivanly-inc` (`case_id=adj-86024a0f`) that predates this corpus expansion and currently fails against the live bundle (incomplete facts — missing `plan_type` — so the strictness rule correctly renders it undeterminable rather than a clean pass). That one case is flagged, not silently fixed: it's real historical adjudication data, and "no mutation of history" means editing someone else's promoted case isn't a call to make unilaterally — route it through `kernl-change-control`.
 
-This is a real, load-bearing gap, not cosmetic: replay (section 2) is only as strong as the case set it checks against. A corpus of 45 synthetic cases in one domain is a much weaker publish gate than the arc's own stated target of promoting real adjudications into golden cases over time (`CLAUDE.md` build order step 4 — "deliberation hardens into precedent").
+This is still a real, load-bearing gap, not fully closed: replay (section 2) is only as strong as the case set it checks against, and 73 cases weighted toward one workflow (refund) is a much weaker publish gate than the arc's own stated target of promoting real adjudications into golden cases over time (`CLAUDE.md` build order step 4 — "deliberation hardens into precedent"). The higgsfield corpus in particular covers one workflow out of the several its source docs describe (see `data/sources/higgsfield/`'s eng_runbook.md, hr_finance.md, and the Slack/ticket JSON exports for what's not yet modeled).
 
 **How cases actually grow, in priority order:**
 1. **Adjudication promotion** (the intended, real mechanism): resolving an escalation with `promote_to_golden: true` (`POST /v1/escalations/{id}/resolve`) adds a non-synthetic case with `provenance: "adjudication:<event_id>"`. This is how the corpus is *supposed* to grow in production — every real ambiguous decision that gets ruled on becomes a regression test.
@@ -100,8 +100,8 @@ Facts verified against the repo on **2026-07-16**. Re-verify volatile facts befo
 | Full suite is LLM/DB/network-free and its count | `python -m pytest backend/tests/ -q --ignore=backend/tests/test_pg_stores.py` |
 | Property/metamorphic test list | `grep -n "^def test_" backend/tests/test_evaluator_properties.py` |
 | Publish gate (409 without ack'd replay) | `grep -n "409" backend/v1_api.py` near the publish handler |
-| Golden case corpus size and provenance | `python -c "import sys; sys.path.insert(0,'.'); from backend.bundle.seed_rivanly import *" ` then count `_case(` calls; `grep -c "^\s*_case(" backend/bundle/seed_rivanly.py` |
-| higgsfield has no seed | `find backend/bundle -iname "seed_higgsfield*"` (expect no hits) |
+| Golden case corpus size per corpus | `grep -c "^\s*_case(" backend/bundle/seed_rivanly.py backend/bundle/seed_higgsfield.py` |
+| higgsfield seed exists and its scope | `python -c "from backend.bundle.seed_higgsfield import build_bundle; b=build_bundle(); print(len(b.policies), [w.name for w in b.workflows])"` |
 | Adjudication promotion path | `grep -n "promote_to_golden" backend/v1_api.py backend/escalation/service.py` |
 | smoke/stress now target /v1, not the compile pipeline | `grep -n "onboarding\|decisions/evaluate" scripts/smoke_test.py` |
 | eval_harness.py is not wired to /v1 | `grep -rln "eval_harness" backend/v1_api.py backend/ledger/ backend/replay/` (expect no hits) |
