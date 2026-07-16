@@ -1,12 +1,37 @@
 ---
 name: kernl-debugging-playbook
-description: Load this skill when something in kernl is BROKEN or behaving strangely - compile hangs or dies around 600s, pipeline "succeeds" but the brain has few or zero skills, every LLM call fails or seems to hang, frontend 404s on /companies/{id} or /auth/config, "No compiled brain found", agent answers "ambiguous" for everything, ImportError/TypeError from the eval scripts, SSE stream ends with a "timeout" event, port confusion (8081 vs 7860 vs 8080 vs 8000), or slow first embedding call. Provides a symptom-to-triage table with exact first-check commands, discriminating experiments, and fix pointers.
+description: Load this skill when something in Kernl is BROKEN or behaving strangely. For V1 (/v1 API, ledger, evaluator, replay, onboarding, console frontend) issues, see section 0 below FIRST. Sections 1+ are a legacy-pipeline playbook (compile hangs, SSE timeouts, brain has zero skills, eval harness ImportErrors) for the retired pre-V1 system - kept for archaeological reference, not applicable to /v1.
 ---
 
-# kernl: Debugging Playbook
+# Kernl: Debugging Playbook
 
-**What this covers:** symptom -> first check -> likely cause -> fix pointer, for kernl's known real failure modes. Discriminating experiments so you stop guessing.
-**When NOT to use this:** starting/calling the API normally -> `kernl-run-and-operate`. Installing deps / env setup -> `kernl-build-and-env`. Env vars and thresholds -> `kernl-config-and-flags`. Pipeline internals -> `kernl-architecture-contract`, `knowledge-compilation-reference`. Eval harness usage and its known breakage details -> `kernl-validation-and-qa`. The "everything is ambiguous" accuracy campaign -> `kernl-eval-inversion-campaign`. Full incident history -> `kernl-failure-archaeology`. Fixing anything you diagnose here -> `kernl-change-control` first.
+**What this covers:** symptom -> first check -> likely cause -> fix pointer.
+**When NOT to use this:** starting/calling the API normally -> `kernl-run-and-operate`. Installing deps / env setup -> `kernl-build-and-env`. Validating a change -> `kernl-validation-and-qa`. Fixing anything you diagnose here -> `kernl-change-control` first.
+
+---
+
+## 0. V1 issues (start here for anything /v1-related)
+
+`backend/api.py`'s legacy surface (compile, SSE, skills marketplace, `/agent/*`) was fully retired 2026-07-16 — every route returns a clean `410`. **If you're seeing 410s and expected a legacy endpoint to work, that's not a bug** — see `kernl-run-and-operate` section 7 for the retirement rationale and the `/v1` equivalent.
+
+| Symptom | First check | Likely cause | Fix pointer |
+|---|---|---|---|
+| `backend.api` import is slow (multi-second) or pulls huge memory | `python -c "import time; t=time.perf_counter(); from backend.api import app; print(time.perf_counter()-t)"` | Something re-introduced an eager import of the legacy pipeline (`backend.engine.*`) into `backend/api.py`'s module scope | Should be <1s importing only `backend.v1_api`. Check `git diff backend/api.py` against the 2026-07-16 retirement commit. |
+| Server crashes on startup with a `numpy`/`pandas` ABI error | `pip show numpy` | Unpinned/upgraded numpy resolved to 2.x, binary-incompatible with pandas pulled in transitively via `sentence-transformers` | `pip install "numpy<2"`; confirm `backend/requirements.txt` still pins it |
+| `POST /v1/decisions/evaluate` (or any write) returns a raw `500` under concurrent load | Check server logs for `ChainConflict`/`chain break` | Two writers for the same tenant raced to seal against the same ledger head | Should self-heal via retry (`backend/ledger/service.py`, `_MAX_CHAIN_CONFLICT_RETRIES`) and surface as a clean `503`, not a `500`, if it's still happening after 2026-07-16 that retry logic regressed |
+| `POST /v1/tenants` returns 401 even with what looks like the right key | `echo $KERNL_ADMIN_KEY` in the shell that started uvicorn, not your current shell | Admin key is read once at request time from the *server process's* env, not the caller's | Restart the server with `KERNL_ADMIN_KEY` set in the same shell/session that launches uvicorn |
+| `POST /v1/onboarding/drafts/{id}/ground` returns 400 on a citation you're sure is correct | Byte-compare your `excerpt` against the source at `[span_start:span_end]` exactly, including whitespace | The grounding check is a strict byte-match by design (constitutional rule 2: no uncited norm) — no fuzzy matching | Fix the span/excerpt to match exactly; this is not a bug to work around |
+| `POST /v1/bundles/{id}/publish` returns 409 | `GET /v1/replays?candidate_record_id=<id>` | No acknowledged replay run for this exact bundle hash yet | Run `POST /v1/replays` then `POST /v1/replays/{run_id}/acknowledge` first — see `kernl-run-and-operate` section 4 |
+| `npm run dev` spawns many `node.exe` processes / OOMs | `tasklist \|` filter on `node.exe` (Windows) | Turbopack root-inference bug on some Windows/Git-Bash setups (fixed 2026-07-16 via `turbopack.root` pin) | Confirm `frontend/next.config.ts` still has the pin; `taskkill /F /IM node.exe` to clear orphans; fall back to `npm run build && npm run start` |
+| Frontend shows a raw error instead of a clean message | Check `frontend/src/lib/api.ts`'s `ApiError` and `frontend/src/components/ui/ErrorNotice.tsx` | Every `/v1` call is normalized through `ApiError`; if a screen bypasses `call()` it loses that normalization | Route the fetch through the shared client, don't hand-roll a new one |
+
+For anything not covered above, tier 1 of `kernl-validation-and-qa` (the full deterministic suite) is the fastest way to find out if a symptom is a real regression or environmental.
+
+---
+
+## 1+. Legacy pipeline playbook (historical — not applicable to /v1)
+
+Everything below describes the pre-V1 compile/SSE/eval-harness system. Its endpoints (`/compile`, `/compile/{job_id}/stream`, `/agent/query`, `/skills/*`) are retired and return `410`. Kept for archaeological reference only — do not follow these runbooks expecting them to work against the current server.
 
 **Jargon (defined once):**
 - **Brain / skills file** — the compiled JSON the pipeline produces (`{skills, graph_json, metadata_json, meta}`); "skills" are structured policy rules, not Codex skills.

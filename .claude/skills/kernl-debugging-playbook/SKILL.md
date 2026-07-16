@@ -1,15 +1,40 @@
 ---
 name: kernl-debugging-playbook
-description: Load this skill when something in kernl is BROKEN or behaving strangely - compile hangs or dies around 600s, pipeline "succeeds" but the brain has few or zero skills, every LLM call fails or seems to hang, frontend 404s on /companies/{id} or /auth/config, "No compiled brain found", agent answers "ambiguous" for everything, ImportError/TypeError from the eval scripts, SSE stream ends with a "timeout" event, port confusion (8081 vs 7860 vs 8080 vs 8000), or slow first embedding call. Provides a symptom-to-triage table with exact first-check commands, discriminating experiments, and fix pointers.
+description: Load this skill when something in Kernl is BROKEN or behaving strangely. For V1 (/v1 API, ledger, evaluator, replay, onboarding, console frontend) issues, see section 0 below FIRST. Sections 1+ are a legacy-pipeline playbook (compile hangs, SSE timeouts, brain has zero skills, eval harness ImportErrors) for the retired pre-V1 system - kept for archaeological reference, not applicable to /v1.
 ---
 
-# kernl: Debugging Playbook
+# Kernl: Debugging Playbook
 
-**What this covers:** symptom -> first check -> likely cause -> fix pointer, for kernl's known real failure modes. Discriminating experiments so you stop guessing.
-**When NOT to use this:** starting/calling the API normally -> `kernl-run-and-operate`. Installing deps / env setup -> `kernl-build-and-env`. Env vars and thresholds -> `kernl-config-and-flags`. Pipeline internals -> `kernl-architecture-contract`, `knowledge-compilation-reference`. Eval harness usage and its known breakage details -> `kernl-validation-and-qa`. The "everything is ambiguous" accuracy campaign -> `kernl-eval-inversion-campaign`. Full incident history -> `kernl-failure-archaeology`. Fixing anything you diagnose here -> `kernl-change-control` first.
+**What this covers:** symptom -> first check -> likely cause -> fix pointer.
+**When NOT to use this:** starting/calling the API normally -> `kernl-run-and-operate`. Installing deps / env setup -> `kernl-build-and-env`. Validating a change -> `kernl-validation-and-qa`. Fixing anything you diagnose here -> `kernl-change-control` first.
+
+---
+
+## 0. V1 issues (start here for anything /v1-related)
+
+`backend/api.py`'s legacy surface (compile, SSE, skills marketplace, `/agent/*`) was fully retired 2026-07-16 — every route returns a clean `410`. **If you're seeing 410s and expected a legacy endpoint to work, that's not a bug** — see `kernl-run-and-operate` section 7 for the retirement rationale and the `/v1` equivalent.
+
+| Symptom | First check | Likely cause | Fix pointer |
+|---|---|---|---|
+| `backend.api` import is slow (multi-second) or pulls huge memory | `python -c "import time; t=time.perf_counter(); from backend.api import app; print(time.perf_counter()-t)"` | Something re-introduced an eager import of the legacy pipeline (`backend.engine.*`) into `backend/api.py`'s module scope | Should be <1s importing only `backend.v1_api`. Check `git diff backend/api.py` against the 2026-07-16 retirement commit. |
+| Server crashes on startup with a `numpy`/`pandas` ABI error | `pip show numpy` | Unpinned/upgraded numpy resolved to 2.x, binary-incompatible with pandas pulled in transitively via `sentence-transformers` | `pip install "numpy<2"`; confirm `backend/requirements.txt` still pins it |
+| `POST /v1/decisions/evaluate` (or any write) returns a raw `500` under concurrent load | Check server logs for `ChainConflict`/`chain break` | Two writers for the same tenant raced to seal against the same ledger head | Should self-heal via retry (`backend/ledger/service.py`, `_MAX_CHAIN_CONFLICT_RETRIES`) and surface as a clean `503`, not a `500`, if it's still happening after 2026-07-16 that retry logic regressed |
+| `POST /v1/tenants` returns 401 even with what looks like the right key | `echo $KERNL_ADMIN_KEY` in the shell that started uvicorn, not your current shell | Admin key is read once at request time from the *server process's* env, not the caller's | Restart the server with `KERNL_ADMIN_KEY` set in the same shell/session that launches uvicorn |
+| `POST /v1/onboarding/drafts/{id}/ground` returns 400 on a citation you're sure is correct | Byte-compare your `excerpt` against the source at `[span_start:span_end]` exactly, including whitespace | The grounding check is a strict byte-match by design (constitutional rule 2: no uncited norm) — no fuzzy matching | Fix the span/excerpt to match exactly; this is not a bug to work around |
+| `POST /v1/bundles/{id}/publish` returns 409 | `GET /v1/replays?candidate_record_id=<id>` | No acknowledged replay run for this exact bundle hash yet | Run `POST /v1/replays` then `POST /v1/replays/{run_id}/acknowledge` first — see `kernl-run-and-operate` section 4 |
+| `npm run dev` spawns many `node.exe` processes / OOMs | `tasklist \|` filter on `node.exe` (Windows) | Turbopack root-inference bug on some Windows/Git-Bash setups (fixed 2026-07-16 via `turbopack.root` pin) | Confirm `frontend/next.config.ts` still has the pin; `taskkill /F /IM node.exe` to clear orphans; fall back to `npm run build && npm run start` |
+| Frontend shows a raw error instead of a clean message | Check `frontend/src/lib/api.ts`'s `ApiError` and `frontend/src/components/ui/ErrorNotice.tsx` | Every `/v1` call is normalized through `ApiError`; if a screen bypasses `call()` it loses that normalization | Route the fetch through the shared client, don't hand-roll a new one |
+
+For anything not covered above, tier 1 of `kernl-validation-and-qa` (the full deterministic suite) is the fastest way to find out if a symptom is a real regression or environmental.
+
+---
+
+## 1+. Legacy pipeline playbook (historical — not applicable to /v1)
+
+Everything below describes the pre-V1 compile/SSE/eval-harness system. Its endpoints (`/compile`, `/compile/{job_id}/stream`, `/agent/query`, `/skills/*`) are retired and return `410`. Kept for archaeological reference only — do not follow these runbooks expecting them to work against the current server.
 
 **Jargon (defined once):**
-- **Brain / skills file** — the compiled JSON the pipeline produces (`{skills, graph_json, metadata_json, meta}`); "skills" are structured policy rules, not Claude skills.
+- **Brain / skills file** — the compiled JSON the pipeline produces (`{skills, graph_json, metadata_json, meta}`); "skills" are structured policy rules, not Codex skills.
 - **Compile** — running the LangGraph pipeline (`POST /compile`) that turns files in `data/sources/<company_id>/` into a brain. LangGraph is a DAG orchestrator; kernl fans out five extraction nodes in parallel, then joins at a barrier node (backend/engine/graph.py).
 - **vLLM gateway** — the shared, rate-limited HTTP proxy that serves ALL LLM calls. It is a custom shape: `POST {VLLM_BASE_URL}/generate` with an `x-api-key` header (backend/core/llm.py:94-98). It is NOT OpenAI-compatible; there is no `/v1/chat/completions`.
 - **SSE** — Server-Sent Events; `GET /compile/{job_id}/stream` streams pipeline stage events (backend/core/sse.py).
@@ -80,7 +105,7 @@ Decision tree:
 
 The current gateway contract (as of 2026-07-08): `POST {VLLM_BASE_URL}/generate`, headers `x-api-key` and `x-user-name: kernl`, body `{"messages":[...]}`, response JSON field `"response"` (backend/core/llm.py:93-107). Default `VLLM_BASE_URL` is `http://172.20.7.22:9000` (backend/core/llm.py:13).
 
-**Trap:** `backend/.env.example` is STALE — its first line is `VLLM_BASE_URL=http://<MI300X_IP>:8000/v1` (backend/.env.example:1), the OLD OpenAI-compatible shape. If someone copies it, every call goes to `.../v1/generate` and fails. `CLAUDE.md` lines 82-83, 100, and 381 describe the same dead `/v1` world. The repo code wins.
+**Trap:** `backend/.env.example` is STALE — its first line is `VLLM_BASE_URL=http://<MI300X_IP>:8000/v1` (backend/.env.example:1), the OLD OpenAI-compatible shape. If someone copies it, every call goes to `.../v1/generate` and fails. `AGENTS.md` lines 82-83, 100, and 381 describe the same dead `/v1` world. The repo code wins.
 
 Checks:
 ```powershell
@@ -102,7 +127,7 @@ This is a known break, not a misconfiguration on your side. Do not "fix" it by h
 | **8081** | Dockerfile (`EXPOSE 8081`, uvicorn CMD), frontend default `API_BASE` (frontend/src/lib/api.ts:1-2), scripts/smoke_test.py:17 | **Canonical backend port** |
 | 7860 | README.md:7 (`app_port: 7860`, Hugging Face Space header) | MISMATCH vs Dockerfile's 8081 — HF Spaces expects the app on `app_port`; known inconsistency |
 | 8080 | scripts/stress_test.py:20 (stale), serve_chat.py:3 (scratch chat UI, separate server) | stress_test is stale; serve_chat is intentionally its own port |
-| 8000 | CLAUDE.md:82-83, 100, 381 | Stale pre-refactor docs (old vLLM `/v1` world); ignore |
+| 8000 | AGENTS.md:82-83, 100, 381 | Stale pre-refactor docs (old vLLM `/v1` world); ignore |
 
 Canonical local start (from repo root): `python -m uvicorn backend.api:app --port 8081` (this exact hint is printed by scripts/smoke_test.py:293).
 
@@ -154,7 +179,7 @@ Normal termination is a `pipeline_complete` or `pipeline_error` event (sse.py:29
 
 One paragraph each; the full chronicle of every incident lives in `kernl-failure-archaeology`.
 
-**The stale `.env.example`.** The gateway migrated from an OpenAI-compatible vLLM endpoint (`http://<host>:8000/v1`, `openai` SDK) to a custom proxy (`POST {base}/generate`, `x-api-key`), but `backend/.env.example:1` and large parts of `CLAUDE.md` (lines 82-83, 100, 381) still describe the old world. Anyone bootstrapping from the example env gets 100% LLM failure with confusing errors, because `/health` on the wrong base URL can even succeed while `/generate` 404s. Rule of thumb this repo teaches: **trust backend/core/llm.py, never the docs**, for the gateway contract.
+**The stale `.env.example`.** The gateway migrated from an OpenAI-compatible vLLM endpoint (`http://<host>:8000/v1`, `openai` SDK) to a custom proxy (`POST {base}/generate`, `x-api-key`), but `backend/.env.example:1` and large parts of `AGENTS.md` (lines 82-83, 100, 381) still describe the old world. Anyone bootstrapping from the example env gets 100% LLM failure with confusing errors, because `/health` on the wrong base URL can even succeed while `/generate` 404s. Rule of thumb this repo teaches: **trust backend/core/llm.py, never the docs**, for the gateway contract.
 
 **The silent empty list.** `safe_llm_json_call`'s double-parse-failure path returns `[]` instead of raising (backend/core/llm.py:216-217). Extraction nodes extend their results with it, the graph completes, `write_brain` persists a near-empty brain, and the SSE stream proudly reports success. Downstream, the agent gives weak answers and the eval craters — days later, far from the cause. The counts in the node print-lines and `stage` events (§2b) are the ONLY early signal; make reading them a reflex after every compile.
 
@@ -186,7 +211,7 @@ Facts verified against the working tree on **2026-07-08**. Re-verify volatile fa
 | Embedding truncation `max_length=128` | `grep -n "max_length" backend/core/llm.py` |
 | Canonical port 8081 | `grep -n "8081" Dockerfile frontend/src/lib/api.ts scripts/smoke_test.py` |
 | README HF `app_port: 7860` mismatch | `grep -n "app_port" README.md` |
-| Stale 8080 / 8000 references | `grep -n "8080" scripts/stress_test.py serve_chat.py; grep -n "8000" CLAUDE.md backend/.env.example` |
+| Stale 8080 / 8000 references | `grep -n "8080" scripts/stress_test.py serve_chat.py; grep -n "8000" AGENTS.md backend/.env.example` |
 | Stale `/v1` in `.env.example` | `head -1 backend/.env.example` |
 | Missing `/companies` & `/auth/config` routes | `grep -n "companies\|auth/config" backend/api.py` (expect no route hits) |
 | Frontend still calls them | `grep -n "companies\|auth/config" frontend/src/app/page.tsx frontend/src/lib/auth.tsx` |

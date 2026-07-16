@@ -1,17 +1,17 @@
 ---
 name: kernl-build-and-env
-description: Load this when setting up the kernl dev environment from scratch, fixing a broken install, or debugging "ModuleNotFoundError", pip dependency gaps, .env / VLLM_BASE_URL misconfiguration, Docker / Hugging Face Spaces build issues, or Windows path problems. Provides the verified prerequisites, backend/frontend install runbooks, the honest gaps in requirements.txt, the correct .env template (backend/.env.example is stale), zero-dependency install verification, and known traps (port mismatches, PYTHONPATH, first-run model downloads).
+description: Load this when setting up the Kernl dev environment from scratch, fixing a broken install, or debugging "ModuleNotFoundError", pip dependency gaps, .env misconfiguration (KERNL_DB_URL, KERNL_ADMIN_KEY, KERNL_API_KEYS), Docker/Hugging Face Spaces build issues, or Windows path problems. Provides verified prerequisites, backend/frontend install runbooks, the honest gaps in requirements.txt, the correct .env template (backend/.env.example is stale), zero-dependency install verification, and known traps.
 ---
 
-# kernl — Build and Environment Setup
+# Kernl — Build and Environment Setup
 
-**What this covers:** recreating the dev environment from nothing — prerequisites, Python/Node installs, `.env`, install verification, optional Supabase DB, Docker/HF Spaces, and Windows traps.
+**What this covers:** recreating the dev environment from nothing — prerequisites, Python/Node installs, `.env`, install verification, optional Postgres DB, Docker/HF Spaces, and Windows traps.
 
 **When NOT to use this:**
-- Starting/operating the running app, endpoints, compile jobs → `kernl-run-and-operate`
+- Starting/operating the running app, `/v1` endpoints → `kernl-run-and-operate`
 - Env vars/flags semantics beyond initial setup → `kernl-config-and-flags`
 - Something installed fine but behaves wrong → `kernl-debugging-playbook`
-- Running evals or QA → `kernl-validation-and-qa`; code/architecture rules → `kernl-architecture-contract`; making changes → `kernl-change-control`
+- Running replay/golden-case QA → `kernl-validation-and-qa`; architecture rules → `kernl-architecture-contract`; making changes → `kernl-change-control`
 
 ---
 
@@ -19,144 +19,150 @@ description: Load this when setting up the kernl dev environment from scratch, f
 
 | Tool | Version | Why |
 |---|---|---|
-| Python | 3.11 | Production pins `python:3.11-slim` (Dockerfile:1). Use 3.11 locally to match. |
-| Node.js | 20+ | Frontend is Next.js **16.2.5** (frontend/package.json:12) — newer than most AI models' training data. The frontend has its own conventions: read `frontend/AGENTS.md` and `node_modules/next/dist/docs/` before writing frontend code; do not assume Next.js APIs from memory. |
-| git | any recent | Repo history is a diagnostic tool (see `kernl-failure-archaeology`). |
+| Python | 3.11 | Production pins `python:3.11-slim` (`Dockerfile:1`). |
+| Node.js | 20+ | Frontend is Next.js **16.2.5** (`frontend/package.json`) — newer than most AI models' training data. Read `frontend/AGENTS.md` and `node_modules/next/dist/docs/` before writing frontend code; do not assume Next.js APIs from memory. |
+| git | any recent | |
 
-**Jargon, defined once:**
-- **vLLM gateway** — a shared, live HTTP proxy in front of a vLLM inference server. The backend talks to it via `backend/core/llm.py` using plain `httpx` POSTs to `{VLLM_BASE_URL}/generate` (llm.py:94), *not* the OpenAI SDK. It is a shared resource: do not hammer it to "test your install" (see section 9).
-- **Supabase** — hosted Postgres used as the skills database. Optional for local dev (section 5).
-- **Brain** — the compiled skills JSON the pipeline produces; the runtime agent reads it from DB or from a local fallback file.
-
-**Trap:** the root `CLAUDE.md` describes an older layout (`backend/main.py`, `backend/llm.py`, OpenAI SDK client, 5-table schema). The actual code is `backend/api.py`, `backend/core/llm.py` (httpx client), and a 7-table `backend/schema.sql` (as of 2026-07-07). When CLAUDE.md and code disagree, the code wins.
+**Trap:** the root `AGENTS.md` mirrors `CLAUDE.md` and is accurate for the current V1 architecture — but do not trust any doc's specific file paths or line numbers without re-verifying; this repo has moved fast and stale specifics are the norm, not the exception, in older skill files.
 
 ---
 
 ## 2. Backend setup runbook
 
-All commands run **from the repo root**. The path contains a space — quote it everywhere.
+All commands run **from the repo root**.
 
-```powershell
-cd "d:\Abhijith P\Desktop\Project\kernl"
+```bash
+cd /path/to/Kernl
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1        # PowerShell; use .venv\Scripts\activate.bat for cmd
+source .venv/Scripts/activate    # or .venv\Scripts\Activate.ps1 on PowerShell
 python -m pip install --upgrade pip
 pip install -r backend/requirements.txt
 ```
 
-### The honest gaps in requirements.txt (as of 2026-07-07)
+### requirements.txt, as it actually stands
 
-`backend/requirements.txt` lists exactly: `fastapi>=0.115, uvicorn[standard], openai, langgraph>=0.4, sentence-transformers, numpy, supabase, python-dotenv, python-multipart, pydantic`. Three problems:
+```
+fastapi>=0.115, uvicorn[standard], openai, langgraph>=0.4, sentence-transformers,
+numpy<2, supabase, python-dotenv, python-multipart, pydantic,
+psycopg[binary]>=3.2, hypothesis>=6.100
+```
+
+Two things worth knowing:
 
 | Gap | Detail |
 |---|---|
-| **Dead dependency** | `openai` is listed but no longer imported anywhere in `backend/` or `scripts/` (verify: `grep -rn "import openai" backend scripts` → no hits). Safe to install; do not write new code against it. |
-| **Implicit dependencies** | `backend/core/llm.py:5-8` imports `httpx`, `torch`, and `transformers` directly. None are listed. Today they arrive **transitively** (`httpx` via `supabase`/`openai`; `torch`+`transformers` via `sentence-transformers`) — this is fragile: a future `sentence-transformers` release could drop or change them and silently break the install. Note the `sentence_transformers` package itself is never imported; it exists in requirements only as the transitive carrier. |
-| **Scripts need `requests`** | `scripts/smoke_test.py:11` and `scripts/stress_test.py:14` import `requests`, which is not listed and not guaranteed transitively. |
+| **numpy is deliberately pinned `<2`** | An unpinned resolve pulls numpy 2.x, which is binary-incompatible with the pandas version pulled in transitively via `sentence-transformers` (`ValueError: numpy.dtype size changed`). This isn't hypothetical — it crashed the whole server mid-session before being pinned. Don't remove the pin without re-verifying the whole `sentence-transformers -> transformers -> sklearn -> pandas` chain is still numpy-1.x-compatible. |
+| **`openai`, `langgraph`, `sentence-transformers` are legacy-pipeline deps** | They're needed only by `backend/engine/` (the retired extraction pipeline, still used as a library by `backend/tests/eval_harness.py` and diagnostic scripts) — **not** by the live `/v1` API, which `backend/api.py` no longer eagerly imports as of 2026-07-16. If you only care about `/v1`, `python -c "from backend.api import app"` should complete in well under a second; if it's slow, something is re-introducing an eager legacy import. |
 
-**Safe install line** — run after the requirements install to pin the implicit deps explicitly:
-
-```powershell
-pip install httpx torch transformers requests
-```
-
-(On a CPU-only machine, `pip install torch` pulls the large default wheel; that is expected — the embedding model runs on CPU, `torch.set_num_threads(2)` at llm.py:31.)
+`psycopg[binary]` and `hypothesis` are V1-era additions (Postgres adapters, property-based evaluator tests) — make sure your install actually picked them up if you're working from an older venv.
 
 ---
 
-## 3. Environment file (.env)
+## 3. Environment file (`backend/.env`)
 
-**Warning: `backend/.env.example` is stale (as of 2026-07-07).** It shows `VLLM_BASE_URL=http://<MI300X_IP>:8000/v1` — the `/v1` suffix is wrong for the current code, it omits `VLLM_API_KEY`, and its `COMPANY_ID` is read by nothing (the eval harness hardcodes `rivanly-inc` at backend/tests/eval_harness.py:33).
+**`backend/.env.example` is stale** — it documents the pre-V1 legacy-pipeline setup (`VLLM_BASE_URL`, `COMPANY_ID`) and is missing every variable the live `/v1` system actually reads.
 
-Correct template — create `backend/.env` (gitignored):
+Correct template for **V1 work** — create `backend/.env` (gitignored):
 
 ```bash
-# Gateway base URL: NO /v1 suffix. Code appends /generate and /health itself
-# (backend/core/llm.py:72,94). Defaults live at llm.py:13-14 if unset.
-VLLM_BASE_URL=http://<gateway-host>:<port>
-VLLM_API_KEY=<ask the team; do NOT commit>
+# Postgres persistence. Unset -> in-memory reference stores (fine for tests/
+# quick local dev, but VOLATILE: all state is lost on process restart).
+KERNL_DB_URL=postgresql://...    # or SUPABASE_DB_URL -- either name works
 
-# Optional — app runs without these (section 5)
-SUPABASE_URL=<your supabase project url>
-SUPABASE_KEY=<your supabase anon key>
+# Gates POST /v1/tenants (tenant provisioning). Unset = provisioning is
+# closed, not open -- this is intentional fail-closed behavior, not a bug.
+KERNL_ADMIN_KEY=<pick a bootstrap secret>
+
+# Optional: static bootstrap tenant keys, bypassing /v1/tenants entirely.
+# "<key>:<company_id>:<role>[,...]", role is owner|approver|agent.
+KERNL_API_KEYS=
+
+# Only needed if you're touching the legacy extraction pipeline
+# (backend/engine/, eval_harness.py) -- not required for /v1 work.
+VLLM_BASE_URL=http://<gateway-host>:<port>   # NO trailing /v1
+VLLM_API_KEY=<ask the team; do NOT commit>
 ```
 
 Rules:
-- `VLLM_BASE_URL` is the **gateway shape without `/v1`**. If health checks 404, the first suspect is a trailing `/v1`.
-- Never commit credentials. For current default values see `backend/core/llm.py:13-14` — do not copy them into docs or chat.
-- **Security:** a Hugging Face token was committed in git history (commit `22ee2f0`, in the old `backend/llm.py`). Treat it as compromised — it must be revoked, never reused, and never reproduced anywhere.
-- `load_dotenv(override=True)` at llm.py:11 means `backend/.env` **overrides** already-set shell env vars for the LLM module.
+- Never commit credentials.
+- **Security:** a Hugging Face token was committed in git history (commit `22ee2f0`, old `backend/llm.py`). Treat it as compromised — revoked, never reused, never reproduced anywhere including docs or chat.
+- `load_dotenv(override=True)` in `backend/core/llm.py` means `backend/.env` **overrides** already-set shell env vars for the legacy LLM module specifically — doesn't apply to `KERNL_*` vars, which are read via plain `os.environ.get`.
 
 ---
 
 ## 4. Verify the install (no LLM, no DB, no network)
 
-Run in this order; each step widens the surface tested.
+**Step 1 — imports resolve, and fast:**
 
-**Step 1 — imports resolve** (from repo root, venv active):
-
-```powershell
-python -c "import fastapi, uvicorn, langgraph, numpy, supabase, httpx, torch, transformers; print('imports OK')"
+```bash
+python -c "import time; t=time.perf_counter(); from backend.api import app; print(f'{time.perf_counter()-t:.2f}s, {len(app.routes)} routes')"
 ```
 
-**Step 2 — the zero-dependency smoke check.** `backend/tests/test_constraint_resolver.py` runs **26 tests** of the deterministic constraint resolver — no LLM calls, no DB, no network (its import chain is pure stdlib):
+Expect well under 1 second and 50+ routes. If it takes several seconds, something is re-introducing an eager legacy import into the `/v1` startup path — that's a regression, not normal.
 
-```powershell
-python backend/tests/test_constraint_resolver.py
+**Step 2 — the full deterministic suite** (no LLM, no DB, no network — this is the canonical "is my checkout + Python sane" check):
+
+```bash
+python -m pytest backend/tests/ -q --ignore=backend/tests/test_pg_stores.py
 ```
 
-Expect `Results: 26/26 passed, 0 failed`, exit code 0. This is the canonical "is my checkout + Python sane" check. It self-inserts the repo root into `sys.path` (test file line 11), but run it from the repo root anyway for consistency.
+Expect `144 passed` (as of 2026-07-16; re-verify the count, it grows). This covers bundle IR, the evaluator (including property-based + metamorphic suites), ledger, escalation/replay lifecycle, seed data, the `/v1` API surface, onboarding, and observability — all deterministic.
 
-**Step 3 — gateway reachability (needs network + credentials).** Only after `.env` is set:
+**Step 3 — the live-DB contract suite (needs `KERNL_DB_URL` set to a real Postgres):**
 
-```powershell
-python backend/test_health.py
+```bash
+python -m pytest backend/tests/test_pg_stores.py -v
 ```
 
-This calls `check_vllm_health()` (backend/core/llm.py:68) — it requires the shared gateway to be reachable. `{"healthy": True, ...}` means you are fully wired. If it fails, recheck `VLLM_BASE_URL` shape (no `/v1`) and `VLLM_API_KEY`. Do not proceed to compiles to "test harder" — see section 9.
+Runs against a throwaway schema in the real DB. Skipped (not failed — a hard `sys.exit(0)`, which `pytest -q` on the whole `backend/tests/` directory will report as a collection error unless you `--ignore` it, as in Step 2) if `KERNL_DB_URL`/`SUPABASE_DB_URL` is unset.
+
+**Step 4 — end-to-end smoke test against a running server:**
+
+```bash
+uvicorn backend.api:app --host 127.0.0.1 --port 8000 &
+KERNL_ADMIN_KEY=<your key> python scripts/smoke_test.py --base-url http://127.0.0.1:8000
+```
+
+Expect `29 passed, 0 failed`. See `kernl-run-and-operate` for the full endpoint reference and runbook.
 
 ---
 
-## 5. Database setup (optional)
+## 5. Database setup
 
-The app **runs without Supabase**. `backend/core/db/supabase.py:10-15` sets the client to `None` when `SUPABASE_URL`/`SUPABASE_KEY` are absent, and the brain agent falls back to a checked-in compiled brain at `backend/tests/last_compiled_brain.json` (fallback path defined at backend/runtime/brain_agent.py:602-604). Query-time agent work therefore needs no DB. Compile runs that persist versions do need it.
+The app **runs without Postgres** — `KERNL_DB_URL` unset means the container falls back to in-memory reference stores (`backend/v1_container.py`). Fine for tests and quick local iteration; state does not survive a restart.
 
-To set up the DB: open the Supabase SQL editor and run the whole of `backend/schema.sql`. It creates **7 tables** — `companies`, `skills_files`, `skills`, `source_files`, `compile_runs`, `operational_entities`, `relationship_edges` — and seeds the demo company `rivanly-inc` (schema.sql:10, idempotent `ON CONFLICT DO NOTHING`). Then fill `SUPABASE_URL`/`SUPABASE_KEY` in `backend/.env`.
+For real persistence: run `backend/schema.sql` against your Postgres instance (17 `CREATE TABLE` statements as of 2026-07-16 — the original 7-table legacy schema plus the V1 bundle/ledger/escalation/replay tables). Then set `KERNL_DB_URL` in `backend/.env`.
 
-Demo source data ships in the repo: 8 files under `data/sources/rivanly-inc/` (5 markdown SOPs + 3 JSON exports).
+Seed data ships in the repo: `data/sources/rivanly-inc/` (used by `backend/bundle/seed_rivanly.py` — 22 authored policies, 45 golden cases) and `data/sources/higgsfield/` (raw docs only, not yet seeded into a bundle — see `kernl-validation-and-qa` for corpus status).
 
 ---
 
 ## 6. Frontend setup
 
-```powershell
-cd "d:\Abhijith P\Desktop\Project\kernl\frontend"
+```bash
+cd frontend
 npm install
-npm run dev          # Next.js dev server on http://localhost:3000
+npm run build && npm run start    # production mode -- see the dev-mode trap below
 ```
 
-- The frontend targets the backend via `NEXT_PUBLIC_API_URL`, defaulting to `http://localhost:8081` (frontend/src/lib/api.ts:2). Override in `frontend/.env.local` (gitignored) if your backend runs elsewhere.
-- Stack: Next.js 16.2.5, React 19.2.4, Tailwind v4, TypeScript (frontend/package.json). Again: this Next.js version postdates most models' training data — consult `frontend/AGENTS.md` and the in-repo Next docs before coding.
+- Targets the backend via `NEXT_PUBLIC_KERNL_API_URL`, defaulting to `http://127.0.0.1:8000`. Override in `frontend/.env.local` (gitignored) if your backend runs elsewhere.
+- Stack: Next.js 16.2.5, React 19.2.4, Tailwind v4, TypeScript.
+
+**`npm run dev` trap (found and fixed 2026-07-16):** Turbopack's automatic workspace-root detection could misresolve to the repo root instead of `frontend/` on some Windows/Git-Bash setups, causing a `Can't resolve 'tailwindcss'` crash-loop that leaked a worker process per retry — observed spawning 300+ orphaned `node.exe` processes until the machine ran out of memory. Fixed by pinning `turbopack.root` explicitly in `frontend/next.config.ts`. If `npm run dev` ever misbehaves again on Windows: (1) verify that pin is still present, (2) `taskkill /F /IM node.exe` to clear any orphans — stopping the dev-server process does not reliably kill its full Windows process tree, (3) fall back to `npm run build && npm run start` (production mode, no Turbopack dev-compiler) while investigating.
 
 ---
 
 ## 7. Docker and Hugging Face Spaces
 
-The root `Dockerfile` builds the **backend only**: `python:3.11-slim` base, installs `backend/requirements.txt` (so it inherits the same implicit-dependency fragility as section 2), copies `backend/` and `data/`, sets `ENV PYTHONPATH=/app`, `EXPOSE 8081`, and runs:
+Root `Dockerfile`: `python:3.11-slim` base, installs `backend/requirements.txt`, copies `backend/` and `data/`, sets `PYTHONPATH=/app`, `EXPOSE 8081`, runs:
 
 ```
 uvicorn backend.api:app --host 0.0.0.0 --port 8081
 ```
 
-**Known break (as of 2026-07-07):** the README's HF Spaces frontmatter declares `app_port: 7860` (README.md:7) while the container serves on **8081**. HF Spaces routes traffic to `app_port`, so with this mismatch the Space cannot reach the app. Fix one side (change `app_port` to 8081, or the Dockerfile/CMD to 7860) — via change control (`kernl-change-control`), not ad hoc.
+**Known break, unresolved:** `README.md`'s HF Spaces frontmatter declares `app_port: 7860` while the Dockerfile serves on `8081`. HF Spaces routes traffic to `app_port` — with this mismatch the Space cannot reach the app. Reconcile one side before deploying (via `kernl-change-control`, not ad hoc).
 
-**PYTHONPATH mirror:** the container relies on `PYTHONPATH=/app` so `backend.*` imports resolve. Locally you get the same effect by always running from the repo root:
-
-```powershell
-python -m uvicorn backend.api:app --port 8081     # from repo root, venv active
-```
-
-Note: `scripts/smoke_test.py:17` targets `http://localhost:8081`, but `scripts/stress_test.py:20` targets `http://localhost:8080` — the stress test port is stale (as of 2026-07-07); edit or ignore accordingly.
+**PYTHONPATH mirror:** locally, always run from the repo root so `backend.*` imports resolve the same way the container's `PYTHONPATH=/app` does.
 
 ---
 
@@ -164,45 +170,34 @@ Note: `scripts/smoke_test.py:17` targets `http://localhost:8081`, but `scripts/s
 
 | Trap | Rule |
 |---|---|
-| Path contains a space (`d:\Abhijith P\...`) | Quote every path in every command, script, and config. Unquoted paths fail in surprising places (pip, npm scripts, PowerShell args). |
-| `backend.*` imports fail (`ModuleNotFoundError: backend`) | You ran from the wrong directory. Run `python -m ...` and all test scripts **from the repo root** so the `backend` package resolves (mirrors the container's `PYTHONPATH=/app`). |
-| Stray `nul` files | Windows redirection to `NUL` under Git Bash can create literal files named `nul`. They are gitignored (`.gitignore`: `nul`, `backend/nul`) — do not commit or chase them as bugs. |
-| First embedding call hangs/downloads | `sentence-transformers/all-MiniLM-L6-v2` downloads from Hugging Face on first use (backend/core/llm.py:32-35). Needs network access and a minute or two; cached afterward in the HF cache dir. Budget for this on first agent query or eval. |
-| PowerShell 5.1 | No `&&` chaining; run commands separately or use `;`. |
+| `backend.*` imports fail (`ModuleNotFoundError: backend`) | Wrong working directory. Run `python -m ...` and test scripts **from the repo root**. |
+| Stray `nul` files | Windows redirection to `NUL` under Git Bash can create literal files named `nul`. Gitignored — don't chase them as bugs. |
+| PowerShell 5.1 | No `&&` chaining; use `;` or separate commands. |
+| `npm run dev` fork-bomb | See section 6 — pin `turbopack.root`, and always verify `node.exe` process count after stopping a dev/start server. |
+| First embedding call hangs/downloads | Only if you're touching the legacy pipeline: `sentence-transformers/all-MiniLM-L6-v2` downloads from Hugging Face on first use. Not on the `/v1` critical path. |
 
 ---
 
 ## 9. What NOT to do
 
-- **Do not run compiles or evals to test your install.** The vLLM gateway is a shared live environment; a compile fans out many LLM calls. The install check is section 4 — the 26 resolver unit tests plus one `test_health.py` ping. Nothing more.
+- Do not run the legacy compile pipeline or evals to "test your install" — the shared vLLM gateway is live infrastructure, and none of it is on the `/v1` critical path anyway. Section 4 is the actual install check.
 - Do not "fix" `requirements.txt`, ports, or the Dockerfile inline while setting up — file it through `kernl-change-control`.
-- Do not write new code against the `openai` package (dead dep) or against CLAUDE.md's described layout (stale).
-- Do not paste credential values (gateway key, Supabase keys, anything from commit `22ee2f0`) into files, logs, or chat.
+- Do not paste credential values (gateway key, DB connection strings, anything from commit `22ee2f0`) into files, logs, or chat.
 
 ---
 
 ## Provenance and maintenance
 
-All facts verified directly against the repo on **2026-07-07**. Re-verify volatile facts before trusting this document:
+Facts verified directly against the repo on **2026-07-16**. Re-verify volatile facts before trusting this document:
 
 | Fact | Re-verification command (from repo root) |
 |---|---|
 | requirements.txt exact contents | `cat backend/requirements.txt` |
-| `openai` is a dead dep | `grep -rn "import openai\|from openai" backend scripts` (expect no hits) |
-| httpx/torch/transformers implicit imports | `grep -n "import httpx\|import torch\|from transformers" backend/core/llm.py` (expect lines 5, 7, 8) |
-| scripts need `requests` | `grep -n "import requests" scripts/smoke_test.py scripts/stress_test.py` |
-| Gateway URL shape (no /v1) and defaults | `grep -n "VLLM_BASE_URL\|VLLM_API_KEY" backend/core/llm.py` (lines 13-14); `grep -n "/generate\|/health" backend/core/llm.py` |
-| `.env.example` still stale | `cat backend/.env.example` (still shows `:8000/v1` + `COMPANY_ID`?) |
-| Resolver test count = 26 | `grep -c "def test_" backend/tests/test_constraint_resolver.py` |
-| Resolver test is LLM/DB-free | `head -5 backend/tests/test_constraint_resolver.py` |
-| Supabase optional / None client | `sed -n '10,16p' backend/core/db/supabase.py` |
-| Local brain fallback path | `grep -n "last_compiled_brain" backend/runtime/brain_agent.py` (~line 603) |
-| Schema table count = 7 + seed | `grep -c "CREATE TABLE" backend/schema.sql` ; `grep -n "rivanly-inc" backend/schema.sql` |
-| Docker port 8081 / PYTHONPATH | `grep -n "EXPOSE\|PYTHONPATH\|CMD" Dockerfile` |
-| HF `app_port` 7860 mismatch | `grep -n "app_port" README.md` |
-| Next.js / React versions | `grep -n '"next"\|"react"' frontend/package.json` |
-| Frontend API URL default 8081 | `grep -n "NEXT_PUBLIC_API_URL" frontend/src/lib/api.ts` |
-| smoke=8081 vs stress=8080 ports | `grep -n "^API = " scripts/smoke_test.py scripts/stress_test.py` |
-| `nul` gitignore entries | `grep -n "^nul\|backend/nul" .gitignore` |
-| Embedding model first-use download | `grep -n "all-MiniLM-L6-v2" backend/core/llm.py` |
-| Leaked-token commit exists | `git show --stat 22ee2f0` (do not print its diff into shared docs) |
+| numpy pin reason | `git log -p --follow -- backend/requirements.txt \| grep -A3 numpy` |
+| backend.api import time | `python -c "import time; t=time.perf_counter(); from backend.api import app; print(time.perf_counter()-t)"` |
+| Full test count | `python -m pytest backend/tests/ -q --ignore=backend/tests/test_pg_stores.py` |
+| Schema table count | `grep -c "CREATE TABLE" backend/schema.sql` |
+| Seed corpus status | `grep -c "^\s*_case(" backend/bundle/seed_rivanly.py`; check `data/sources/higgsfield/` for a seed script |
+| Turbopack root pin | `grep -n "turbopack" frontend/next.config.ts` |
+| Docker/HF port mismatch | `grep -n "port\|EXPOSE" Dockerfile; head -9 README.md` |
+| Leaked-token commit (do not print contents) | `git log --oneline 22ee2f0 -1` |
