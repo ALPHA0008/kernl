@@ -20,8 +20,8 @@ from backend.replay.engine import InMemoryReplayRunStore, ReplayEngine
 
 def test_bundle_builds_and_evidence_is_verified():
     bundle = build_bundle()
-    assert len(bundle.policies) == 8
-    assert len(bundle.workflows) == 1
+    assert len(bundle.policies) == 18
+    assert len(bundle.workflows) == 3  # refund, bug_triage, expense
     for p in bundle.policies:
         assert p.evidence, p.id
         for ev in p.evidence:
@@ -35,8 +35,10 @@ def test_bundle_hash_is_stable_across_builds():
 
 def test_golden_set_shape():
     cases = build_golden_cases()
-    assert len(cases) >= 15
+    assert len(cases) >= 28  # refund + bug_triage + expense coverage
     assert all(c.synthetic for c in cases)  # [synthetic] until real tenants exist
+    # all three workflows are represented
+    assert {c.workflow for c in cases} == {"refund", "bug_triage", "expense"}
     ids = [c.case_id for c in cases]
     assert len(ids) == len(set(ids)), "duplicate golden case ids"
 

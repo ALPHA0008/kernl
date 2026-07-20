@@ -1,19 +1,24 @@
 """The authored higgsfield reference bundle [synthetic] + golden cases.
 
-Second seeded corpus (2026-07-16), built the same way as seed_rivanly.py: a
-policy bundle hand-authored from data/sources/higgsfield/, with evidence
-spans VERIFIED at build time -- every excerpt must literally exist in its
-source file or the builder raises. source_version is the sha256 of the file
-bytes.
+Second seeded corpus (2026-07-16, expanded 2026-07-17), built the same way
+as seed_rivanly.py: a policy bundle hand-authored from data/sources/
+higgsfield/, with evidence spans VERIFIED at build time -- every excerpt
+must literally exist in its source file or the builder raises.
+source_version is the sha256 of the file bytes.
 
-Scope: the refund/subscription policy section of
-higgsfield_customer_policy.md (section 1) -- the richest, most clearly
-typed-condition-shaped ruleset in the higgsfield source set. Deliberately
-narrower than rivanly's 9-workflow bundle; this is a real starting corpus
-for a second tenant, not a claim of full coverage of every higgsfield
-source document. Growing it further (eng_runbook.md, hr_finance.md, the
-Slack/ticket JSON exports) is future work, same as any real tenant's
-onboarding backlog.
+Scope: three workflows across three source docs --
+  * refund   (higgsfield_customer_policy.md section 1): plan-tiered refund
+    windows, usage caps, and a fraud-signal screen.
+  * bug_triage (higgsfield_eng_runbook.md sections 1 & 3): P0-P3 severity
+    routing, with the P1+enterprise AE-notification override.
+  * expense  (higgsfield_hr_finance.md section 3.1): the amount-tier
+    approval ladder, with the "new SaaS regardless of amount" override.
+
+Still not a claim of FULL coverage of every higgsfield source: the Slack/
+ticket JSON exports and finer rules within each doc (deploy windows,
+rollback criteria, PIP/termination, vendor payment) are not yet modeled --
+the next authoring targets if this corpus needs to grow further, same as any
+real tenant's onboarding backlog.
 
 Everything produced here is labeled [synthetic].
 """
@@ -60,6 +65,8 @@ def _c(field: str, op: str, value, vtype: str) -> Condition:
 
 def build_bundle() -> Bundle:
     policy_doc = "higgsfield_customer_policy.md"
+    runbook = "higgsfield_eng_runbook.md"
+    hr_finance = "higgsfield_hr_finance.md"
 
     workflows = (
         WorkflowSpec(
@@ -80,6 +87,27 @@ def build_bundle() -> Bundle:
                 FactSpec(name="refund_amount", value_type="number", default=0,
                          description="requested refund in USD; unknown -> assume no "
                                       "monetary amount is in question"),
+            ),
+        ),
+        WorkflowSpec(
+            name="bug_triage",
+            description="Incident/bug severity routing (Engineering).",
+            facts=(
+                FactSpec(name="severity", value_type="string",
+                         description="p0 | p1 | p2 | p3"),
+                FactSpec(name="customer_type", value_type="string", default="standard",
+                         description="enterprise | standard"),
+            ),
+        ),
+        WorkflowSpec(
+            name="expense",
+            description="Expense approval authority ladder (Finance).",
+            facts=(
+                FactSpec(name="amount", value_type="number",
+                         description="expense amount in USD"),
+                FactSpec(name="is_new_saas", value_type="boolean", default=False,
+                         description="a new recurring SaaS subscription (special-cased "
+                                      "by the policy regardless of amount)"),
             ),
         ),
     )
@@ -197,6 +225,125 @@ def build_bundle() -> Bundle:
                       "rule the current bundle does not yet model -- see module "
                       "docstring on scope).",
         ),
+        # ---- bug_triage (from higgsfield_eng_runbook.md) --------------------
+        Policy(
+            id="triage.p0_page_on_call",
+            workflow="bug_triage",
+            effect=Effect(kind=OutcomeKind.ROUTE, action="page_on_call"),
+            priority=100,
+            conditions=(_c("severity", "eq", "p0", "string"),),
+            evidence=(_evidence(runbook,
+                "On-call engineer MUST post in #incidents within 5 minutes of alert. "
+                "If no post in 5 minutes, Engineering Lead gets automatically paged by "
+                "PagerDuty."),),
+            rationale="P0 is the always-page path; the runbook mandates on-call "
+                      "engagement within 5 minutes.",
+        ),
+        Policy(
+            id="triage.p1_enterprise_notify_ae",
+            workflow="bug_triage",
+            effect=Effect(kind=OutcomeKind.ROUTE, action="notify_ae_and_on_call"),
+            priority=90,
+            conditions=(
+                _c("severity", "eq", "p1", "string"),
+                _c("customer_type", "eq", "enterprise", "string"),
+            ),
+            evidence=(_evidence(runbook,
+                "When a P1 affects a named enterprise customer, the AE for that "
+                "customer must be notified within 15 minutes"),),
+            rationale="P1 + enterprise adds the AE-notification obligation on top of "
+                      "ordinary P1 handling.",
+        ),
+        Policy(
+            id="triage.p1_standard_assign_on_call",
+            workflow="bug_triage",
+            effect=Effect(kind=OutcomeKind.ROUTE, action="assign_to_on_call"),
+            priority=70,
+            conditions=(_c("severity", "eq", "p1", "string"),),
+            evidence=(_evidence(runbook,
+                "P0 and P1 bugs: assigned to on-call engineer immediately, regardless "
+                "of their sprint commitments"),),
+            rationale="Baseline P1 handling; the enterprise rule (higher specificity + "
+                      "priority) overrides this when the customer is enterprise.",
+        ),
+        Policy(
+            id="triage.p2_next_standup",
+            workflow="bug_triage",
+            effect=Effect(kind=OutcomeKind.ROUTE, action="triage_next_standup"),
+            priority=60,
+            conditions=(_c("severity", "eq", "p2", "string"),),
+            evidence=(_evidence(runbook,
+                "P2 bugs: triaged in next daily standup, assigned to appropriate team"),),
+            rationale="P2 is not an interrupt; it enters the daily standup queue.",
+        ),
+        Policy(
+            id="triage.p3_backlog",
+            workflow="bug_triage",
+            effect=Effect(kind=OutcomeKind.ROUTE, action="add_to_backlog"),
+            priority=50,
+            conditions=(_c("severity", "eq", "p3", "string"),),
+            evidence=(_evidence(runbook,
+                "P3 bugs: added to backlog, reviewed in sprint planning"),),
+            rationale="P3 is backlog work reviewed at sprint planning.",
+        ),
+        # ---- expense (from higgsfield_hr_finance.md) -----------------------
+        Policy(
+            id="expense.new_saas_cfo",
+            workflow="expense",
+            effect=Effect(kind=OutcomeKind.ESCALATE, action="require_cfo_approval"),
+            priority=100,
+            conditions=(_c("is_new_saas", "eq", True, "boolean"),),
+            evidence=(_evidence(hr_finance,
+                "Any new recurring SaaS expense (regardless of amount) requires CFO "
+                "approval"),),
+            rationale="New SaaS is CFO-gated regardless of amount -- outranks the "
+                      "amount-tier ladder below.",
+        ),
+        Policy(
+            id="expense.manager_under_500",
+            workflow="expense",
+            effect=Effect(kind=OutcomeKind.APPROVE, action="approve_by_manager"),
+            priority=70,
+            conditions=(_c("amount", "lt", 500, "number"),),
+            evidence=(_evidence(hr_finance, "| Under $500 | Direct manager |"),),
+            rationale="Under $500: direct manager authority (the ladder's lowest rung).",
+        ),
+        Policy(
+            id="expense.dept_head_500_to_2500",
+            workflow="expense",
+            effect=Effect(kind=OutcomeKind.ROUTE, action="route_to_department_head"),
+            priority=70,
+            conditions=(
+                _c("amount", "gte", 500, "number"),
+                _c("amount", "lte", 2500, "number"),
+            ),
+            evidence=(_evidence(hr_finance, "| $500 – $2,500 | Department Head |"),),
+            rationale="$500–$2,500 inclusive: department head.",
+        ),
+        Policy(
+            id="expense.cfo_2500_to_10000",
+            workflow="expense",
+            effect=Effect(kind=OutcomeKind.ESCALATE, action="require_cfo_approval"),
+            priority=70,
+            conditions=(
+                _c("amount", "gt", 2500, "number"),
+                _c("amount", "lte", 10000, "number"),
+            ),
+            evidence=(_evidence(hr_finance, "| $2,500 – $10,000 | CFO |"),),
+            rationale="Above $2,500 through $10,000: CFO. (The doc's tiers overlap at "
+                      "the $2,500 boundary; resolved here as <=2500 dept-head, >2500 "
+                      "CFO, so every amount maps to exactly one rung.)",
+        ),
+        Policy(
+            id="expense.cfo_ceo_above_10000",
+            workflow="expense",
+            effect=Effect(kind=OutcomeKind.ESCALATE, action="require_cfo_and_ceo_approval"),
+            priority=80,
+            conditions=(_c("amount", "gt", 10000, "number"),),
+            evidence=(_evidence(hr_finance, "| Above $10,000 | CFO + CEO |"),),
+            rationale="Above $10,000: joint CFO + CEO. Slightly higher priority so the "
+                      "top rung is unambiguous at the boundary.",
+        ),
     )
 
     return Bundle(company_id=COMPANY_ID, workflows=workflows, policies=policies)
@@ -283,4 +430,53 @@ def build_golden_cases() -> list[GoldenCase]:
               "escalate", reason="no_matching_policy",
               notes="lifetime_deal is not a plan type this bundle's scope covers "
                     "(section 1 of the source doc is silent on it) -- documented gap"),
+        # ---- bug_triage (from higgsfield_eng_runbook.md) --------------------
+        _case("HF-BUG-01", "bug_triage", {"severity": "p0"},
+              "route", "page_on_call", provenance="authored from higgsfield_eng_runbook.md"),
+        _case("HF-BUG-02", "bug_triage",
+              {"severity": "p1", "customer_type": "enterprise"},
+              "route", "notify_ae_and_on_call",
+              notes="p1 + enterprise: specificity (2 conds) + priority beats the "
+                    "standard p1 rule",
+              provenance="authored from higgsfield_eng_runbook.md"),
+        _case("HF-BUG-03", "bug_triage",
+              {"severity": "p1", "customer_type": "standard"},
+              "route", "assign_to_on_call",
+              notes="p1 standard: the enterprise rule's customer_type condition fails "
+                    "cleanly, baseline p1 handling fires",
+              provenance="authored from higgsfield_eng_runbook.md"),
+        _case("HF-BUG-04", "bug_triage", {"severity": "p2"},
+              "route", "triage_next_standup",
+              provenance="authored from higgsfield_eng_runbook.md"),
+        _case("HF-BUG-05", "bug_triage", {"severity": "p3"},
+              "route", "add_to_backlog",
+              provenance="authored from higgsfield_eng_runbook.md"),
+        _case("HF-BUG-06", "bug_triage", {"severity": "p5"},
+              "escalate", reason="no_matching_policy",
+              notes="unknown severity -> no matching rung; a clean gap, not a guess",
+              provenance="authored from higgsfield_eng_runbook.md"),
+        # ---- expense (from higgsfield_hr_finance.md) -----------------------
+        _case("HF-EXP-01", "expense", {"amount": 300},
+              "approve", "approve_by_manager",
+              provenance="authored from higgsfield_hr_finance.md"),
+        _case("HF-EXP-02", "expense", {"amount": 500},
+              "route", "route_to_department_head", notes="boundary: 500 -> dept head (gte)",
+              provenance="authored from higgsfield_hr_finance.md"),
+        _case("HF-EXP-03", "expense", {"amount": 2500},
+              "route", "route_to_department_head", notes="boundary: 2500 inclusive dept head",
+              provenance="authored from higgsfield_hr_finance.md"),
+        _case("HF-EXP-04", "expense", {"amount": 2501},
+              "escalate", "require_cfo_approval", notes="boundary: 2501 -> CFO",
+              provenance="authored from higgsfield_hr_finance.md"),
+        _case("HF-EXP-05", "expense", {"amount": 10000},
+              "escalate", "require_cfo_approval", notes="boundary: 10000 inclusive CFO",
+              provenance="authored from higgsfield_hr_finance.md"),
+        _case("HF-EXP-06", "expense", {"amount": 10001},
+              "escalate", "require_cfo_and_ceo_approval", notes="boundary: 10001 -> CFO+CEO",
+              provenance="authored from higgsfield_hr_finance.md"),
+        _case("HF-EXP-07", "expense", {"amount": 50, "is_new_saas": True},
+              "escalate", "require_cfo_approval",
+              notes="new SaaS (priority 100) overrides the amount ladder even at $50 -- "
+                    "'regardless of amount'",
+              provenance="authored from higgsfield_hr_finance.md"),
     ]
