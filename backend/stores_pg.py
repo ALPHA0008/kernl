@@ -321,8 +321,9 @@ class PgBundleStore(_Pg):
             cur.execute(
                 "INSERT INTO policy_bundles (record_id, company_id, content_hash,"
                 " status, bundle_json, created_at, created_by, published_at,"
-                " published_by, replay_run_id)"
-                " VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                " published_by, replay_run_id, signature, signing_pubkey,"
+                " signature_scheme)"
+                " VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
                 (
                     record.record_id,
                     record.company_id,
@@ -334,6 +335,9 @@ class PgBundleStore(_Pg):
                     record.published_at,
                     record.published_by,
                     record.replay_run_id,
+                    record.signature,
+                    record.signing_pubkey,
+                    record.signature_scheme,
                 ),
             )
             return record
@@ -350,10 +354,14 @@ class PgBundleStore(_Pg):
             published_at=row["published_at"].isoformat() if row["published_at"] else None,
             published_by=row["published_by"],
             replay_run_id=str(row["replay_run_id"]) if row["replay_run_id"] else None,
+            signature=row.get("signature"),
+            signing_pubkey=row.get("signing_pubkey"),
+            signature_scheme=row.get("signature_scheme"),
         )
 
     _COLS = ("record_id, company_id, content_hash, status, bundle_json, created_at,"
-             " created_by, published_at, published_by, replay_run_id")
+             " created_by, published_at, published_by, replay_run_id,"
+             " signature, signing_pubkey, signature_scheme")
 
     def get(self, company_id: str, record_id: str) -> Optional[BundleRecord]:
         with self._tx() as conn, conn.cursor() as cur:
@@ -400,17 +408,22 @@ class PgBundleStore(_Pg):
         return record
 
     def update(self, record: BundleRecord) -> BundleRecord:
-        # bundle content is immutable; only lifecycle metadata may change
+        # bundle content is immutable; only lifecycle metadata (incl. the
+        # signature stamped at publish) may change
         with self._tx() as conn, conn.cursor() as cur:
             cur.execute(
                 "UPDATE policy_bundles SET status = %s, published_at = %s,"
-                " published_by = %s, replay_run_id = %s"
+                " published_by = %s, replay_run_id = %s, signature = %s,"
+                " signing_pubkey = %s, signature_scheme = %s"
                 " WHERE company_id = %s AND record_id = %s",
                 (
                     record.status.value,
                     record.published_at,
                     record.published_by,
                     record.replay_run_id,
+                    record.signature,
+                    record.signing_pubkey,
+                    record.signature_scheme,
                     record.company_id,
                     record.record_id,
                 ),

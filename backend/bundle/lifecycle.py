@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict
 
 from backend.bundle.canonical import bundle_content_hash
 from backend.bundle.schema import Bundle
+from backend.bundle.signing import SCHEME, sign_content_hash
 from backend.replay.engine import ReplayRunStore
 
 
@@ -43,6 +44,29 @@ class BundleRecord(BaseModel):
     published_at: Optional[str] = None
     published_by: Optional[str] = None
     replay_run_id: Optional[str] = None  # the run that gated this publish
+    # Ed25519 signature over content_hash, set at publish when a signing key is
+    # configured. None on drafts and on unsigned publishes (no key present).
+    signature: Optional[str] = None
+    signing_pubkey: Optional[str] = None
+    signature_scheme: Optional[str] = None
+
+    @property
+    def is_signed(self) -> bool:
+        return bool(self.signature and self.signing_pubkey)
+
+    def verify_signature(self) -> bool:
+        """True iff this record carries a valid Ed25519 signature over its own
+        content_hash. False for unsigned records AND for any record whose
+        signature does not verify (tampered content_hash, wrong key, etc.).
+        Callers that must distinguish 'unsigned' from 'signed-but-invalid'
+        should check is_signed first."""
+        from backend.bundle.signing import verify_content_hash
+
+        if not self.is_signed:
+            return False
+        return verify_content_hash(
+            self.content_hash, self.signature or "", self.signing_pubkey or ""
+        )
 
 
 class BundleStore(Protocol):
@@ -140,12 +164,23 @@ class BundleLifecycle:
                 "run and acknowledge a replay before publishing"
             )
 
+        # Sign the content hash at publish. No key configured -> unsigned
+        # publish (explicitly recorded as such; see signing.py). A published
+        # bundle is authority, so this is the moment authenticity is stamped.
+        signed = sign_content_hash(record.content_hash)
+        sig_fields = (
+            {"signature": signed[0], "signing_pubkey": signed[1],
+             "signature_scheme": SCHEME}
+            if signed is not None
+            else {"signature": None, "signing_pubkey": None, "signature_scheme": None}
+        )
         published = record.model_copy(
             update={
                 "status": BundleStatus.PUBLISHED,
                 "published_at": _now_iso(),
                 "published_by": published_by,
                 "replay_run_id": gate.run_id,
+                **sig_fields,
             }
         )
         self._store.update(published)

@@ -117,6 +117,20 @@ def require(min_role: str):
     return dep
 
 
+def _signature_block(record) -> dict:
+    """The signature status of a bundle record, as returned to API callers.
+    Reports three states honestly: signed-and-valid, signed-but-invalid
+    (tampered / wrong key -- a red flag), and unsigned (no signing key was
+    configured at publish). `verified` is computed here, not trusted from
+    storage, so a tampered content_hash cannot masquerade as valid."""
+    return {
+        "signed": record.is_signed,
+        "verified": record.verify_signature(),
+        "signing_pubkey": record.signing_pubkey,
+        "signature_scheme": record.signature_scheme,
+    }
+
+
 # ---------------------------------------------------------------------------
 # request/response models
 
@@ -289,7 +303,8 @@ def list_bundles(
     return {"bundles": [
         {"record_id": r.record_id, "content_hash": r.content_hash,
          "status": r.status.value, "created_at": r.created_at,
-         "published_at": r.published_at, "policy_count": len(r.bundle.policies)}
+         "published_at": r.published_at, "policy_count": len(r.bundle.policies),
+         **_signature_block(r)}
         for r in c.bundles.list(p.company_id)
     ]}
 
@@ -303,7 +318,7 @@ def active_bundle(
     if r is None:
         raise HTTPException(status_code=404, detail="no published bundle")
     return {"record_id": r.record_id, "content_hash": r.content_hash,
-            "bundle": r.bundle.model_dump(mode="json")}
+            "bundle": r.bundle.model_dump(mode="json"), **_signature_block(r)}
 
 
 @router.post("/bundles/drafts")
@@ -342,9 +357,11 @@ def publish_bundle(
         record_id=record.record_id,
         replay_run_id=record.replay_run_id,
         published_by=p.key_id,
+        signed=record.is_signed,
     )
     return {"record_id": record.record_id, "content_hash": record.content_hash,
-            "status": record.status.value, "replay_run_id": record.replay_run_id}
+            "status": record.status.value, "replay_run_id": record.replay_run_id,
+            **_signature_block(record)}
 
 
 @router.post("/bundles/{record_id}/activate")

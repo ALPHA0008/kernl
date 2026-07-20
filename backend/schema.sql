@@ -108,8 +108,15 @@ CREATE TABLE IF NOT EXISTS policy_bundles (
     created_by     TEXT NOT NULL,
     published_at   TIMESTAMPTZ,
     published_by   TEXT,
-    replay_run_id  UUID                       -- the run that gated the publish
+    replay_run_id  UUID,                      -- the run that gated the publish
+    signature        TEXT,                    -- Ed25519 sig over content_hash (hex)
+    signing_pubkey   TEXT,                    -- Ed25519 public key (hex)
+    signature_scheme TEXT                     -- 'ed25519'
 );
+-- Additive columns for pre-existing deployments (idempotent; no-op if present).
+ALTER TABLE policy_bundles ADD COLUMN IF NOT EXISTS signature        TEXT;
+ALTER TABLE policy_bundles ADD COLUMN IF NOT EXISTS signing_pubkey   TEXT;
+ALTER TABLE policy_bundles ADD COLUMN IF NOT EXISTS signature_scheme TEXT;
 -- content-addressed dedup: same content registers once per tenant
 CREATE UNIQUE INDEX IF NOT EXISTS idx_bundles_company_hash
     ON policy_bundles(company_id, content_hash);

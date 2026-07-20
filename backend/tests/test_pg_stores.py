@@ -401,6 +401,46 @@ def test_delete_tenant_purges_all_data_and_is_isolated():
         conn.rollback()
 
 
+def test_bundle_signature_persists_through_postgres():
+    """A signed publish must round-trip its Ed25519 signature through the DB:
+    reload from a fresh connection and the signature still verifies against the
+    stored content_hash. This proves the signature columns + adapter mapping
+    are correct, not just the in-memory path."""
+    import os
+
+    from backend.bundle.signing import SIGNING_KEY_ENV, generate_signing_key
+
+    os.environ[SIGNING_KEY_ENV] = generate_signing_key()
+    try:
+        b = _bundle(days=11)
+        S.cases.add(GoldenCase(
+            case_id="sig-g1", company_id=CID, workflow="refund",
+            facts={"plan_type": "annual", "days_since_purchase": 5},
+            expected=Expected(kind="approve", action="approve_full_refund"),
+            provenance="test-signing",
+        ))
+        draft = S.lifecycle.save_draft(CID, b, created_by="signer")
+        run = S.replay.run(company_id=CID, cases=S.cases.list(CID), candidate=b)
+        S.replay.acknowledge(CID, run.run_id, by="signer")
+        published = S.lifecycle.publish(CID, draft.record_id, published_by="signer")
+        assert published.is_signed and published.verify_signature()
+
+        # reload from a completely fresh store/connection
+        fresh = PgBundleStore(DB_URL, schema=SCHEMA)
+        reloaded = fresh.get(CID, published.record_id)
+        assert reloaded is not None
+        assert reloaded.signature == published.signature
+        assert reloaded.signing_pubkey == published.signing_pubkey
+        assert reloaded.signature_scheme == "ed25519"
+        assert reloaded.verify_signature() is True
+
+        # and tampering the reloaded content_hash breaks verification
+        tampered = reloaded.model_copy(update={"content_hash": "sha256:forged"})
+        assert tampered.verify_signature() is False
+    finally:
+        os.environ.pop(SIGNING_KEY_ENV, None)
+
+
 TESTS = [
     test_ledger_append_idempotency_chain,
     test_history_mutation_blocked_by_database,
@@ -412,6 +452,7 @@ TESTS = [
     test_onboarding_stores_full_flow,
     test_all_stores_share_one_connection,
     test_delete_tenant_purges_all_data_and_is_isolated,
+    test_bundle_signature_persists_through_postgres,
 ]
 
 

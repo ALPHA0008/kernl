@@ -10,3 +10,4 @@ python-multipart
 pydantic
 psycopg[binary]>=3.2
 hypothesis>=6.100
+cryptography>=42  # Ed25519 bundle signing (backend/bundle/signing.py)
