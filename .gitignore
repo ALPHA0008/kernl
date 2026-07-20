@@ -58,3 +58,6 @@ backend_log.txt
 
 
 backend.env
+
+# Rust build artifacts (edge-evaluator)
+/edge-evaluator/target/

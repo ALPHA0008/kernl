@@ -1,0 +1,6 @@
+# This crate builds with the GNU host toolchain, which bundles its own linker
+# (x86_64-w64-mingw32). The MSVC toolchain would require Visual C++ Build Tools,
+# which aren't assumed to be present. On Linux/macOS the default toolchain works
+# fine; this pin only matters on Windows.
+[toolchain]
+channel = "stable-x86_64-pc-windows-gnu"
