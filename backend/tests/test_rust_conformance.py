@@ -29,12 +29,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-# Locate the built Rust binary (release; .exe on Windows).
-_BIN_CANDIDATES = [
-    ROOT / "edge-evaluator" / "target" / "release" / "kernl-eval.exe",
-    ROOT / "edge-evaluator" / "target" / "release" / "kernl-eval",
-]
-RUST_BIN = next((p for p in _BIN_CANDIDATES if p.exists()), None)
+# Locate the built Rust binary for THIS platform. cargo names it `kernl-eval`
+# on Linux/macOS and `kernl-eval.exe` on Windows. Selecting by platform (not
+# "first that exists") is essential: a repo checked out on Linux CI must never
+# pick up a stray Windows `.exe` (e.g. from a mounted volume) and try to exec a
+# PE binary on Linux.
+_REL = ROOT / "edge-evaluator" / "target" / "release"
+_BIN_NAME = "kernl-eval.exe" if sys.platform.startswith("win") else "kernl-eval"
+_candidate = _REL / _BIN_NAME
+RUST_BIN = _candidate if _candidate.exists() else None
 
 _SKIP_MSG = (
     "SKIPPED: the Rust edge evaluator is not built. "

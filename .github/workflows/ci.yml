@@ -47,9 +47,15 @@ jobs:
             assert not heavy, f'/v1 re-coupled to legacy ML: {heavy}'; \
             print(f'OK: /v1 standalone, {len(backend.api.app.routes)} routes')"
       - name: Run deterministic suite
+        # Ignore the two suites that need external resources this job doesn't
+        # provide: test_pg_stores (real Postgres -> backend-db-contract job) and
+        # test_rust_conformance (the built Rust binary -> rust-conformance job).
+        # Each has its own dedicated job; here we run only the LLM/DB/network-free
+        # deterministic tests.
         run: |
           python -m pytest backend/tests/ -q \
-            --ignore=backend/tests/test_pg_stores.py
+            --ignore=backend/tests/test_pg_stores.py \
+            --ignore=backend/tests/test_rust_conformance.py
 
   backend-db-contract:
     name: Backend — live-DB contract suite (Postgres adapters)
