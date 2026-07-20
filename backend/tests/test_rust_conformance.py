@@ -36,13 +36,22 @@ _BIN_CANDIDATES = [
 ]
 RUST_BIN = next((p for p in _BIN_CANDIDATES if p.exists()), None)
 
+_SKIP_MSG = (
+    "SKIPPED: the Rust edge evaluator is not built. "
+    "Run `cd edge-evaluator && cargo build --release` to enable the "
+    "differential conformance suite. (This is a skip, not a pass: the Rust "
+    "evaluator is NOT verified against Python until this suite runs green.)"
+)
+
 if RUST_BIN is None:
-    print(
-        "SKIPPED: the Rust edge evaluator is not built. "
-        "Run `cd edge-evaluator && cargo build --release` to enable the "
-        "differential conformance suite. (This is a skip, not a pass: the Rust "
-        "evaluator is NOT verified against Python until this suite runs green.)"
-    )
+    # Skip cleanly under BOTH runners: pytest collection (skip the whole module,
+    # never a SystemExit that pytest reports as an internal error) and direct
+    # `python test_file.py` (print + exit 0). Importing pytest lazily keeps the
+    # direct-run path dependency-light.
+    print(_SKIP_MSG)
+    if "pytest" in sys.modules:
+        import pytest
+        pytest.skip(_SKIP_MSG, allow_module_level=True)
     sys.exit(0)
 
 from backend.bundle import seed_higgsfield, seed_rivanly

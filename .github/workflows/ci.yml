@@ -97,6 +97,10 @@ jobs:
         run: |
           rm -f rust-toolchain.toml
           cargo build --release
+          echo "--- built binary ---"
+          ls -la target/release/kernl-eval
+          echo '{"facts":{},"bundle":{"workflows":[],"policies":[]},"workflow":"x"}' \
+            | ./target/release/kernl-eval || echo "(non-zero exit expected for unknown workflow)"
       - name: Differential conformance (Rust must match Python on all inputs)
         # Fails if the Rust evaluator diverges from the Python reference on any
         # corpus case or generated input. Skips (never fakes) only if the binary

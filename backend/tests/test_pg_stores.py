@@ -28,13 +28,21 @@ load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 DB_URL = os.environ.get("KERNL_DB_URL") or os.environ.get("SUPABASE_DB_URL")
 
+_SKIP_MSG = (
+    "SKIPPED: no KERNL_DB_URL / SUPABASE_DB_URL configured. "
+    "Add the direct Postgres connection string to .env to run the "
+    "adapter contract suite. (This is a skip, not a pass: the Postgres "
+    "adapters are NOT verified until this suite runs green.)"
+)
+
 if not DB_URL:
-    print(
-        "SKIPPED: no KERNL_DB_URL / SUPABASE_DB_URL configured. "
-        "Add the direct Postgres connection string to .env to run the "
-        "adapter contract suite. (This is a skip, not a pass: the Postgres "
-        "adapters are NOT verified until this suite runs green.)"
-    )
+    # Skip cleanly under BOTH pytest collection (module-level skip, never a
+    # SystemExit pytest treats as an internal error) and direct `python
+    # test_file.py` (print + exit 0).
+    print(_SKIP_MSG)
+    if "pytest" in sys.modules:
+        import pytest
+        pytest.skip(_SKIP_MSG, allow_module_level=True)
     sys.exit(0)
 
 import psycopg
