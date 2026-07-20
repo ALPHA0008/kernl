@@ -1,0 +1,122 @@
+name: CI
+
+# The golden-corpus CI contract (Kernel_arc.md: one of the three things frozen
+# from V1 onward). Every push and PR to main runs the full deterministic suite
+# -- bundle IR, the pure evaluator (incl. property-based + metamorphic), ledger,
+# escalation/replay lifecycle, both seed corpora through the real replay gate,
+# the /v1 API surface, onboarding, observability, and signing. Nothing here
+# touches an LLM, a network, or (in the default job) a database.
+#
+# Deliberately LEAN deps: the /v1 decision path stands alone -- it does NOT need
+# the retired legacy ML chain (torch/transformers/sentence-transformers/
+# langgraph). Installing only what /v1 needs keeps CI fast AND acts as a guard:
+# if a test ever re-couples the enforce path to that legacy chain, this job
+# fails at import, which is exactly the signal we want.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-deterministic:
+    name: Backend — deterministic suite (no LLM/DB/network)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install lean /v1 dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install \
+            "fastapi>=0.115" "uvicorn[standard]" pydantic \
+            "psycopg[binary]>=3.2" "hypothesis>=6.100" \
+            python-dotenv python-multipart httpx pytest cryptography
+      - name: Guard — /v1 imports without the legacy ML chain
+        run: |
+          python -c "import sys; import backend.api; \
+            heavy=[m for m in sys.modules if any(x in m for x in ('torch','transformers','langgraph'))]; \
+            assert not heavy, f'/v1 re-coupled to legacy ML: {heavy}'; \
+            print(f'OK: /v1 standalone, {len(backend.api.app.routes)} routes')"
+      - name: Run deterministic suite
+        run: |
+          python -m pytest backend/tests/ -q \
+            --ignore=backend/tests/test_pg_stores.py
+
+  backend-db-contract:
+    name: Backend — live-DB contract suite (Postgres adapters)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install lean /v1 dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install \
+            "fastapi>=0.115" pydantic "psycopg[binary]>=3.2" \
+            "hypothesis>=6.100" python-dotenv httpx pytest cryptography
+      - name: Run Postgres adapter contract suite
+        # Runs against a throwaway schema in a real DB. If the KERNL_DB_URL
+        # secret is not configured, the suite SKIPS cleanly (sys.exit 0) with a
+        # message -- it never fakes a pass. Set the repo secret KERNL_DB_URL to
+        # a Postgres connection string to enable it.
+        env:
+          KERNL_DB_URL: ${{ secrets.KERNL_DB_URL }}
+        run: python backend/tests/test_pg_stores.py
+
+  rust-conformance:
+    name: Rust edge evaluator — build + differential conformance vs Python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install lean /v1 dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install "fastapi>=0.115" pydantic "hypothesis>=6.100" \
+            python-dotenv httpx pytest cryptography
+      - name: Build the Rust edge evaluator
+        # On Linux the default stable toolchain builds cleanly (the Windows-only
+        # GNU pin in rust-toolchain.toml is overridden here so CI uses the
+        # runner's default host toolchain).
+        working-directory: edge-evaluator
+        run: |
+          rm -f rust-toolchain.toml
+          cargo build --release
+      - name: Differential conformance (Rust must match Python on all inputs)
+        # Fails if the Rust evaluator diverges from the Python reference on any
+        # corpus case or generated input. Skips (never fakes) only if the binary
+        # is missing -- which the build step guarantees it is not.
+        run: python backend/tests/test_rust_conformance.py
+
+  frontend-build:
+    name: Frontend — typecheck + production build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Production build (also runs TypeScript checks)
+        run: npm run build
