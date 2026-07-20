@@ -71,6 +71,60 @@ def test_revoked_and_unknown_keys_do_not_resolve():
     assert svc.tenants.resolve("kk_nonsense") is None
 
 
+def test_key_rotation_issue_then_revoke():
+    """The rotation flow: issue a replacement key, verify it resolves, revoke
+    the old one, verify only the new one still works."""
+    svc = _service()
+    _, old_key = svc.tenants.provision("acme-corp", "Acme")
+    old_rec = svc.tenants.resolve(old_key)
+    assert old_rec is not None
+
+    # issue a second owner key (the replacement)
+    new_rec, new_key = svc.tenants.issue_key("acme-corp", role="owner")
+    assert svc.tenants.resolve(new_key) is not None
+
+    # now safe to revoke the old one -- two owner keys exist
+    revoked = svc.tenants.revoke_key("acme-corp", old_rec.key_id)
+    assert revoked.revoked_at is not None
+    assert svc.tenants.resolve(old_key) is None       # old key dead
+    assert svc.tenants.resolve(new_key) is not None   # new key alive
+
+
+def test_cannot_revoke_last_owner_key():
+    """Lockout protection: the last active owner key cannot be revoked."""
+    svc = _service()
+    _, key = svc.tenants.provision("acme-corp", "Acme")
+    rec = svc.tenants.resolve(key)
+    try:
+        svc.tenants.revoke_key("acme-corp", rec.key_id)
+        assert False, "revoking the last owner key must raise"
+    except ValueError:
+        pass
+    assert svc.tenants.resolve(key) is not None  # still works
+
+
+def test_revoke_is_idempotent_and_non_owner_unrestricted():
+    """A non-owner key can always be revoked (no lockout concern), and
+    revoking an already-revoked key is a no-op that still returns it."""
+    svc = _service()
+    svc.tenants.provision("acme-corp", "Acme")
+    agent_rec, agent_key = svc.tenants.issue_key("acme-corp", role="agent")
+    r1 = svc.tenants.revoke_key("acme-corp", agent_rec.key_id)
+    assert r1.revoked_at is not None
+    r2 = svc.tenants.revoke_key("acme-corp", agent_rec.key_id)  # idempotent
+    assert r2.revoked_at == r1.revoked_at
+    assert svc.tenants.resolve(agent_key) is None
+
+
+def test_delete_tenant_removes_tenant_and_keys():
+    svc = _service()
+    _, key = svc.tenants.provision("acme-corp", "Acme")
+    assert svc.tenants._store.delete_tenant("acme-corp") is True
+    assert svc.tenants._store.get_tenant("acme-corp") is None
+    assert svc.tenants.resolve(key) is None
+    assert svc.tenants._store.delete_tenant("acme-corp") is False  # already gone
+
+
 # ------------------------------------------------------- source grounding
 
 

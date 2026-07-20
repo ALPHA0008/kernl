@@ -177,6 +177,16 @@ def main() -> int:
     check("kernl_decisions_total counter present", "kernl_decisions_total" in text)
     check("kernl_decision_latency_ms histogram present", "kernl_decision_latency_ms" in text)
 
+    # Self-clean per retention policy: on a clean run, purge the throwaway
+    # tenant so smoke tenants don't accumulate. On failure, KEEP it and print
+    # the id prominently so a human can inspect before manual cleanup.
+    print("11. Cleanup")
+    if _failed == 0:
+        r = c.delete(f"/v1/tenants/{co}", headers=admin)
+        check("throwaway tenant purged", r.status_code == 200)
+    else:
+        print(f"  KEEP  run failed -- tenant {co} left intact for inspection")
+
     c.close()
     print(f"\nResults: {_passed} passed, {_failed} failed  (tenant {co})")
     return 1 if _failed else 0

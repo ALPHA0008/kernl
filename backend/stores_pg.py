@@ -92,19 +92,33 @@ def _resolve_hostaddr(conninfo: str, *, attempts: int = 5) -> str:
     )
 
 
-class _Pg:
-    """Shared connection handling: one guarded connection, reconnect on loss,
-    every public operation runs in its own transaction."""
+class SharedPgConn:
+    """One physical connection + one lock, shared by every store in a container.
+
+    Why one connection, not a pool: the arc (Part 11) makes the ledger
+    single-writer-per-org on purpose -- "linearizability trivial", and the
+    honest load math (~115 decisions/sec sustained across ALL tenants) never
+    justifies more. What DID bite in practice is the opposite failure: eight
+    separate _Pg stores each opened their OWN connection, so one container
+    held 8 connections against Supabase's session-pooler cap of 15 -- a real
+    EMAXCONNSESSION outage under light concurrent load. Collapsing all stores
+    onto ONE guarded connection fixes that at the root: a container is now a
+    single-connection client, exactly matching the single-writer design, and
+    a handful of containers fit comfortably under any pooler cap.
+
+    Every store operation still runs in its own lock-guarded transaction; no
+    logical operation spans two stores (verified), so sharing is safe and
+    changes no observable semantics -- it only removes redundant sockets."""
 
     def __init__(self, conninfo: str, schema: str = "public") -> None:
         # Resolve + pin the host address once at construction (with retries),
         # so later reconnects never depend on flaky DNS.
         self._conninfo = _resolve_hostaddr(conninfo)
         self._schema = schema
-        self._lock = threading.Lock()
+        self.lock = threading.Lock()
         self._conn: Optional[psycopg.Connection] = None
 
-    def _connection(self) -> psycopg.Connection:
+    def connection(self) -> psycopg.Connection:
         if self._conn is None or self._conn.closed:
             self._conn = psycopg.connect(self._conninfo, row_factory=dict_row)
             with self._conn.cursor() as cur:
@@ -113,6 +127,42 @@ class _Pg:
                 )
             self._conn.commit()
         return self._conn
+
+    def close(self) -> None:
+        if self._conn is not None and not self._conn.closed:
+            self._conn.close()
+        self._conn = None
+
+
+class _Pg:
+    """Base for the Postgres store adapters. Each holds a reference to a
+    SharedPgConn; every public operation runs in its own transaction.
+
+    Backward compatible: constructing a store with a conninfo string still
+    works (it builds a private SharedPgConn), so existing tests that create a
+    lone store are unaffected. In a real container, pass a single shared
+    SharedPgConn to every store (see backend/v1_container.py) so the whole
+    process uses ONE database connection."""
+
+    def __init__(
+        self,
+        conninfo: str | None = None,
+        schema: str = "public",
+        *,
+        shared: Optional[SharedPgConn] = None,
+    ) -> None:
+        if shared is None:
+            if conninfo is None:
+                raise ValueError("_Pg needs either a conninfo or a shared connection")
+            shared = SharedPgConn(conninfo, schema)
+        self._shared = shared
+
+    @property
+    def _lock(self) -> threading.Lock:
+        return self._shared.lock
+
+    def _connection(self) -> psycopg.Connection:
+        return self._shared.connection()
 
     def _tx(self):
         """Context manager: lock + connection + commit/rollback."""
@@ -695,6 +745,67 @@ class PgTenantStore(_Pg):
                 (company_id,),
             )
             return [_key_from_row(r) for r in cur.fetchall()]
+
+    def get_key(self, company_id: str, key_id: str) -> Optional[ApiKeyRecord]:
+        with self._tx() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT key_id, key_hash, company_id, role, created_at, revoked_at"
+                " FROM api_keys WHERE company_id = %s AND key_id = %s",
+                (company_id, key_id),
+            )
+            r = cur.fetchone()
+            return _key_from_row(r) if r else None
+
+    def revoke_key(self, company_id: str, key_id: str) -> Optional[ApiKeyRecord]:
+        with self._tx() as conn, conn.cursor() as cur:
+            cur.execute(
+                "UPDATE api_keys SET revoked_at = COALESCE(revoked_at, now())"
+                " WHERE company_id = %s AND key_id = %s"
+                " RETURNING key_id, key_hash, company_id, role, created_at, revoked_at",
+                (company_id, key_id),
+            )
+            r = cur.fetchone()
+            return _key_from_row(r) if r else None
+
+    def delete_tenant(self, company_id: str) -> bool:
+        """Purge the tenant and ALL its data across every V1 table, as one
+        transaction. The whole-stream removal is sanctioned by the retention
+        policy (discard the entire logbook), so the append-only trigger is
+        told, for THIS transaction only, that this specific tenant is being
+        purged (see forbid_history_mutation in schema.sql). Order respects FKs:
+        dependents before the rows they reference; companies last."""
+        with self._tx() as conn, conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM companies WHERE id = %s", (company_id,))
+            if cur.fetchone() is None:
+                return False
+            # authorize the ledger purge for this tenant, transaction-scoped
+            cur.execute(
+                "SELECT set_config('kernl.purging_tenant', %s, true)", (company_id,)
+            )
+            # dependents first (respect FKs), then the anchors
+            cur.execute("DELETE FROM active_bundles WHERE company_id = %s", (company_id,))
+            cur.execute("DELETE FROM escalations WHERE company_id = %s", (company_id,))
+            cur.execute("DELETE FROM decision_events WHERE company_id = %s", (company_id,))
+            cur.execute("DELETE FROM replay_runs WHERE company_id = %s", (company_id,))
+            cur.execute("DELETE FROM golden_cases WHERE company_id = %s", (company_id,))
+            cur.execute("DELETE FROM policy_bundles WHERE company_id = %s", (company_id,))
+            cur.execute("DELETE FROM onboarding_drafts WHERE company_id = %s", (company_id,))
+            cur.execute("DELETE FROM source_snapshots WHERE company_id = %s", (company_id,))
+            cur.execute("DELETE FROM api_keys WHERE company_id = %s", (company_id,))
+            # legacy tables that FK to companies(id) -- clear so the parent delete
+            # is not blocked if any residual rows exist
+            for legacy in (
+                "skills_files", "skills", "source_files", "compile_runs",
+                "operational_entities", "relationship_edges",
+            ):
+                cur.execute(
+                    sql.SQL("DELETE FROM {} WHERE company_id = %s").format(
+                        sql.Identifier(legacy)
+                    ),
+                    (company_id,),
+                )
+            cur.execute("DELETE FROM companies WHERE id = %s", (company_id,))
+            return True
 
 
 def _key_from_row(r: dict[str, Any]) -> ApiKeyRecord:

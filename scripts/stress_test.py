@@ -188,6 +188,14 @@ def main() -> int:
     check(f"ledger holds exactly {expected_min} events (no loss, no duplication)",
           len(all_events) == expected_min, f"got {len(all_events)}")
 
+    # Self-clean per retention policy: purge the throwaway tenant on a clean
+    # run; keep it (and say so) on failure so it can be inspected.
+    if _failed == 0:
+        r = c.delete(f"/v1/tenants/{co}", headers={"X-API-Key": admin_key})
+        check("throwaway tenant purged", r.status_code == 200)
+    else:
+        print(f"  KEEP  run failed -- tenant {co} left intact for inspection")
+
     c.close()
     print(f"\nResults: {_passed} passed, {_failed} failed  (tenant {co})")
     return 1 if _failed else 0

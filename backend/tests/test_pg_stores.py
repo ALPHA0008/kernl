@@ -71,6 +71,7 @@ from backend.stores_pg import (
     PgReplayRunStore,
     PgSourceStore,
     PgTenantStore,
+    SharedPgConn,
 )
 
 SCHEMA = f"kernl_test_{uuid.uuid4().hex[:10]}"
@@ -317,6 +318,89 @@ def test_onboarding_stores_full_flow():
     assert len(bundle.policies) == 1
 
 
+def test_all_stores_share_one_connection():
+    """The production wiring: eight stores over ONE SharedPgConn use exactly
+    one physical connection, not eight. This is what fixes the real
+    EMAXCONNSESSION failure -- a container is a single-connection client, in
+    line with the arc's single-writer-per-cell design. Verified by identity
+    (one holder, one lock, one live psycopg connection object) AND by
+    behavior (writes through one store are visible through another on the
+    same shared connection)."""
+    shared = SharedPgConn(DB_URL, schema=SCHEMA)
+    ledger = PgLedgerStore(shared=shared)
+    bundles = PgBundleStore(shared=shared)
+    cases = PgCaseStore(shared=shared)
+    tenants = PgTenantStore(shared=shared)
+
+    # identity: every store points at the same holder + lock
+    assert ledger._shared is bundles._shared is cases._shared is tenants._shared
+    assert ledger._lock is tenants._lock
+
+    # one physical connection object, opened once and reused by all stores
+    conn_via_ledger = ledger._connection()
+    conn_via_bundles = bundles._connection()
+    assert conn_via_ledger is conn_via_bundles
+    assert not conn_via_ledger.closed
+
+    # behavior: a write via one store is visible via another store on the
+    # same shared connection (provisioning goes through TenantService, which
+    # wraps `tenants`; a second store on the same holder reads it back)
+    TenantService(tenants).provision("pg-shared-co", "PG Shared Co")
+    fetched = PgTenantStore(shared=shared).get_tenant("pg-shared-co")
+    assert fetched is not None and fetched.company_id == "pg-shared-co"
+
+    shared.close()
+    assert conn_via_ledger.closed
+
+
+def test_delete_tenant_purges_all_data_and_is_isolated():
+    """Whole-tenant purge (retention policy: discard the entire logbook) works
+    against the live DB -- including deleting decision_events, which the
+    append-only trigger normally blocks. Critically: purging tenant A must NOT
+    touch tenant B's ledger, and the trigger must still block an ordinary
+    (non-purge) delete afterward. This is the constitutional line: whole-stream
+    removal is allowed; editing or partially deleting a live stream is not."""
+    victim = "pg-purge-victim"
+    bystander = CID  # the main test tenant, with real ledger history
+
+    # give the victim its own tenant row + a real ledger event
+    tsvc = TenantService(PgTenantStore(DB_URL, schema=SCHEMA))
+    tsvc.provision(victim, "Purge Victim")
+    b = _bundle()
+    h = bundle_content_hash(b)
+    S.decisions.decide(company_id=victim, workflow="refund",
+                       facts={"plan_type": "annual", "days_since_purchase": 9},
+                       actor=AGENT, idempotency_key="purge-k1", bundle=b, bundle_hash=h)
+    assert len(S.ledger.list(victim)) == 1
+    bystander_events_before = len(S.ledger.list(bystander))
+    assert bystander_events_before >= 1  # the bystander has real history to protect
+
+    # purge the victim
+    deleted = PgTenantStore(DB_URL, schema=SCHEMA).delete_tenant(victim)
+    assert deleted is True
+
+    # victim is gone across the board
+    assert PgTenantStore(DB_URL, schema=SCHEMA).get_tenant(victim) is None
+    assert S.ledger.list(victim) == []
+
+    # bystander is fully intact -- purge was isolated to the victim's stream
+    assert len(S.ledger.list(bystander)) == bystander_events_before
+    assert S.ledger.verify_chain(bystander) is True
+
+    # deleting an unknown tenant is a clean False, not an error
+    assert PgTenantStore(DB_URL, schema=SCHEMA).delete_tenant(victim) is False
+
+    # and the trigger STILL blocks an ordinary delete (purge flag not set)
+    with psycopg.connect(DB_URL) as conn, conn.cursor() as cur:
+        cur.execute(sql.SQL("SET search_path TO {}").format(sql.Identifier(SCHEMA)))
+        try:
+            cur.execute("DELETE FROM decision_events WHERE company_id = %s", (bystander,))
+            assert False, "ordinary DELETE must still be blocked by the trigger"
+        except psycopg.errors.RaiseException:
+            pass
+        conn.rollback()
+
+
 TESTS = [
     test_ledger_append_idempotency_chain,
     test_history_mutation_blocked_by_database,
@@ -326,6 +410,8 @@ TESTS = [
     test_case_duplicate_rejected,
     test_persistence_across_reconnect,
     test_onboarding_stores_full_flow,
+    test_all_stores_share_one_connection,
+    test_delete_tenant_purges_all_data_and_is_isolated,
 ]
 
 

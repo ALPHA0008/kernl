@@ -169,6 +169,73 @@ def test_tenant_isolation_for_provisioned_tenants():
     assert dup.status_code == 409
 
 
+def test_key_rotation_over_http():
+    cl = _client()
+    old = cl.post("/v1/tenants", headers=ADMIN,
+                  json={"company_id": "rot-co", "name": "Rotate Co"}).json()["owner_api_key"]
+    OLD = {"X-API-Key": old}
+    assert cl.get("/v1/me", headers=OLD).status_code == 200
+
+    # issue a replacement owner key
+    issued = cl.post("/v1/tenants/rot-co/keys", headers=OLD, json={"role": "owner"})
+    assert issued.status_code == 200
+    new_key = issued.json()["api_key"]
+    assert new_key.startswith("kk_")
+    NEW = {"X-API-Key": new_key}
+    assert cl.get("/v1/me", headers=NEW).json()["role"] == "owner"
+
+    # list shows two active owner keys (metadata only, no plaintext/hash leaked)
+    keys = cl.get("/v1/tenants/rot-co/keys", headers=OLD).json()["keys"]
+    assert len(keys) == 2 and all("api_key" not in k and "key_hash" not in k for k in keys)
+
+    # find + revoke the OLD key via the NEW one
+    old_key_id = cl.get("/v1/me", headers=OLD).json()["key_id"]
+    rev = cl.request("DELETE", f"/v1/tenants/rot-co/keys/{old_key_id}", headers=NEW)
+    assert rev.status_code == 200
+    # old key is now dead; new key still works
+    assert cl.get("/v1/me", headers=OLD).status_code == 401
+    assert cl.get("/v1/me", headers=NEW).status_code == 200
+
+
+def test_cannot_revoke_last_owner_key_over_http():
+    cl = _client()
+    key = cl.post("/v1/tenants", headers=ADMIN,
+                  json={"company_id": "solo-co", "name": "Solo"}).json()["owner_api_key"]
+    OWNER = {"X-API-Key": key}
+    kid = cl.get("/v1/me", headers=OWNER).json()["key_id"]
+    rev = cl.request("DELETE", f"/v1/tenants/solo-co/keys/{kid}", headers=OWNER)
+    assert rev.status_code == 409  # lockout protection
+    assert cl.get("/v1/me", headers=OWNER).status_code == 200  # still works
+
+
+def test_key_management_is_tenant_scoped():
+    cl = _client()
+    k1 = cl.post("/v1/tenants", headers=ADMIN,
+                 json={"company_id": "scope-a", "name": "A"}).json()["owner_api_key"]
+    cl.post("/v1/tenants", headers=ADMIN, json={"company_id": "scope-b", "name": "B"})
+    # tenant A cannot manage tenant B's keys
+    assert cl.get("/v1/tenants/scope-b/keys", headers={"X-API-Key": k1}).status_code == 403
+    assert cl.post("/v1/tenants/scope-b/keys", headers={"X-API-Key": k1},
+                   json={"role": "agent"}).status_code == 403
+
+
+def test_delete_tenant_over_http():
+    cl = _client()
+    key = cl.post("/v1/tenants", headers=ADMIN,
+                  json={"company_id": "del-co", "name": "Delete Me"}).json()["owner_api_key"]
+    OWNER = {"X-API-Key": key}
+    # tenant is live
+    assert cl.get("/v1/me", headers=OWNER).status_code == 200
+    # deletion is admin-gated: an owner key cannot delete its own tenant
+    assert cl.request("DELETE", "/v1/tenants/del-co", headers=OWNER).status_code == 401
+    # admin deletes it
+    d = cl.request("DELETE", "/v1/tenants/del-co", headers=ADMIN)
+    assert d.status_code == 200 and d.json()["deleted"] is True
+    # the tenant's key no longer resolves; deleting again is 404
+    assert cl.get("/v1/me", headers=OWNER).status_code == 401
+    assert cl.request("DELETE", "/v1/tenants/del-co", headers=ADMIN).status_code == 404
+
+
 TESTS = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
 
 if __name__ == "__main__":

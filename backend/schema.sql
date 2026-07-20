@@ -139,8 +139,21 @@ CREATE TABLE IF NOT EXISTS decision_events (
                                                -- hash verification
 );
 -- append-only enforced AT THE DATABASE for every role (owner included):
+--   * UPDATE is ALWAYS forbidden -- history is never edited in place.
+--   * DELETE is forbidden too, EXCEPT during a sanctioned whole-tenant purge,
+--     which announces itself by setting the session variable
+--     `kernl.purging_tenant` to the exact company_id being removed. This is
+--     the retention policy's "discard the entire logbook" case: removing a
+--     whole append-only stream as a unit is NOT the same as tearing one page
+--     out of a live stream. The row's own company_id must match the declared
+--     purge target, so a purge of tenant A can never delete tenant B's rows.
 CREATE OR REPLACE FUNCTION forbid_history_mutation() RETURNS trigger AS $$
+DECLARE
+    purging TEXT := current_setting('kernl.purging_tenant', true);
 BEGIN
+    IF TG_OP = 'DELETE' AND purging IS NOT NULL AND purging = OLD.company_id THEN
+        RETURN OLD;  -- sanctioned whole-tenant purge of THIS tenant's stream
+    END IF;
     RAISE EXCEPTION 'decision_events is append-only (CLAUDE.md rule 3): % blocked', TG_OP;
 END; $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS decision_events_append_only ON decision_events;

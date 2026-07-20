@@ -95,6 +95,31 @@ class Container:
     def escalations_by_decision(self, company_id: str, decision_event_id: str) -> Optional[Escalation]:
         return self.escalation_store.by_decision(company_id, decision_event_id)
 
+    def delete_tenant(self, company_id: str) -> bool:
+        """Purge a tenant and all its data. Returns False if the tenant is
+        unknown. Whole-tenant removal is sanctioned by the retention policy
+        (discard the entire logbook, not tear out a page) -- see
+        docs/RETENTION_POLICY.md and the append-only trigger in schema.sql.
+
+        Postgres: PgTenantStore.delete_tenant cascades every table in one
+        transaction (authoritative). In-memory: the tenant store drops the
+        tenant + keys; the other volatile reference stores are best-effort
+        purged where they expose a purge hook. In-memory state is dev/test
+        only and does not survive a restart, so residual per-tenant rows
+        there are not a durability concern."""
+        if self.tenant_store.get_tenant(company_id) is None:
+            return False
+        # Best-effort purge of any reference store that offers a hook (the Pg
+        # tenant store already cascaded these; in-memory stores may not).
+        for store in (
+            self.ledger, self.bundles, self.escalation_store, self.cases,
+            self.replay_runs, self.source_store, self.draft_store,
+        ):
+            purge = getattr(store, "purge_company", None)
+            if callable(purge):
+                purge(company_id)
+        return self.tenant_store.delete_tenant(company_id)
+
     def seed_rivanly(self) -> None:
         """Idempotent: registers + publishes the reference bundle through the
         real replay gate. Raises if the seed fails its own golden set."""
@@ -166,18 +191,24 @@ def _build_container() -> Container:
             PgReplayRunStore,
             PgSourceStore,
             PgTenantStore,
+            SharedPgConn,
         )
 
         schema = os.environ.get("KERNL_DB_SCHEMA", "public")
+        # ONE connection for the whole container -- all eight stores share it.
+        # This is the arc's single-writer-per-cell design made literal at the
+        # socket level, and it fixes the real EMAXCONNSESSION failure that
+        # eight-connections-per-container hit against Supabase's pooler cap.
+        shared = SharedPgConn(db_url, schema)
         return Container(
-            ledger=PgLedgerStore(db_url, schema=schema),
-            bundles=PgBundleStore(db_url, schema=schema),
-            escalation_store=PgEscalationStore(db_url, schema=schema),
-            cases=PgCaseStore(db_url, schema=schema),
-            replay_runs=PgReplayRunStore(db_url, schema=schema),
-            tenants=PgTenantStore(db_url, schema=schema),
-            sources=PgSourceStore(db_url, schema=schema),
-            drafts=PgDraftStore(db_url, schema=schema),
+            ledger=PgLedgerStore(shared=shared),
+            bundles=PgBundleStore(shared=shared),
+            escalation_store=PgEscalationStore(shared=shared),
+            cases=PgCaseStore(shared=shared),
+            replay_runs=PgReplayRunStore(shared=shared),
+            tenants=PgTenantStore(shared=shared),
+            sources=PgSourceStore(shared=shared),
+            drafts=PgDraftStore(shared=shared),
         )
     return Container()
 

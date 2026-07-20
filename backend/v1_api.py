@@ -16,6 +16,10 @@ Endpoints (all under /v1, all tenant-scoped by API key):
     GET  /v1/escalations[/{id}]        the inbox
     POST /v1/escalations/{id}/resolve  adjudicate (ledgered)
     GET  /v1/cases                     golden case corpus
+    GET  /v1/tenants/{id}/keys          list a tenant's keys (metadata only)
+    POST /v1/tenants/{id}/keys          issue a key (rotation: issue then revoke)
+    DELETE /v1/tenants/{id}/keys/{kid}  revoke a key (idempotent; last-owner-safe)
+    DELETE /v1/tenants/{id}             purge a tenant + all data (admin-gated)
     GET  /v1/me                        principal introspection (tenant + role)
     GET  /v1/health
     GET  /v1/metrics                   Prometheus text: latency/outcome/escalation counters
@@ -142,6 +146,10 @@ class ReplayRequest(BaseModel):
 class ProvisionRequest(BaseModel):
     company_id: str = Field(min_length=2, max_length=64, pattern=r"^[a-z0-9][a-z0-9-]*$")
     name: str = Field(min_length=1, max_length=200)
+
+
+class IssueKeyRequest(BaseModel):
+    role: str = Field(pattern=r"^(owner|approver|agent)$")
 
 
 class SourceUploadRequest(BaseModel):
@@ -571,6 +579,96 @@ def list_tenants(
             for t in c.tenant_store.list_tenants()
         ]
     }
+
+
+@router.get("/tenants/{company_id}/keys")
+def list_tenant_keys(
+    company_id: str,
+    p: Principal = Depends(require("owner")),
+    c: Container = Depends(get_container),
+):
+    """List a tenant's API keys as METADATA ONLY -- never the plaintext or the
+    hash. An owner can see what exists in order to rotate it. Scoped to the
+    caller's own tenant."""
+    if company_id != p.company_id:
+        raise HTTPException(status_code=403, detail="can only manage your own tenant's keys")
+    return {
+        "keys": [
+            {
+                "key_id": k.key_id,
+                "role": k.role,
+                "created_at": k.created_at,
+                "revoked_at": k.revoked_at,
+                "active": k.revoked_at is None,
+            }
+            for k in c.tenants.list_keys(company_id)
+        ]
+    }
+
+
+@router.post("/tenants/{company_id}/keys")
+def issue_tenant_key(
+    company_id: str,
+    req: IssueKeyRequest,
+    p: Principal = Depends(require("owner")),
+    c: Container = Depends(get_container),
+):
+    """Issue a new API key for the caller's own tenant. The plaintext is
+    returned ONCE here and never again. This is the 'issue' half of key
+    rotation: mint a replacement, then revoke the old key."""
+    if company_id != p.company_id:
+        raise HTTPException(status_code=403, detail="can only manage your own tenant's keys")
+    try:
+        record, plaintext = c.tenants.issue_key(company_id, role=req.role)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    log_event("tenant.key_issued", tenant=company_id, key_id=record.key_id,
+              role=record.role, issued_by=p.key_id)
+    return {
+        "key_id": record.key_id,
+        "role": record.role,
+        "api_key": plaintext,  # shown once; store it now
+    }
+
+
+@router.delete("/tenants/{company_id}/keys/{key_id}")
+def revoke_tenant_key(
+    company_id: str,
+    key_id: str,
+    p: Principal = Depends(require("owner")),
+    c: Container = Depends(get_container),
+):
+    """Revoke a key for the caller's own tenant. Idempotent. Refuses to revoke
+    the last active owner key (that would lock the tenant out of its own
+    administration -- issue a new owner key first, then revoke the old one)."""
+    if company_id != p.company_id:
+        raise HTTPException(status_code=403, detail="can only manage your own tenant's keys")
+    try:
+        revoked = c.tenants.revoke_key(company_id, key_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    log_event("tenant.key_revoked", tenant=company_id, key_id=key_id, revoked_by=p.key_id)
+    return {"key_id": revoked.key_id, "revoked_at": revoked.revoked_at}
+
+
+@router.delete("/tenants/{company_id}")
+def delete_tenant(
+    company_id: str,
+    _admin: str = Depends(require_admin),
+    c: Container = Depends(get_container),
+):
+    """Purge a tenant and ALL its data. Admin-gated, same as provisioning.
+    Whole-tenant removal is sanctioned by docs/RETENTION_POLICY.md -- discard
+    the entire logbook as a unit, which is not history mutation. Irreversible."""
+    deleted = c.delete_tenant(company_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"unknown tenant {company_id!r}")
+    log_event("tenant.deleted", tenant=company_id)
+    return {"company_id": company_id, "deleted": True}
 
 
 @router.post("/sources")

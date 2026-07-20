@@ -30,18 +30,15 @@ None of the above has (or should get) a delete/expire mechanism in the ordinary 
 
 ## 3. Retained but genuinely disposable — currently NO cleanup mechanism (a real gap)
 
-This is the honest part: as of 2026-07-16, **nothing in the codebase deletes any of the following.** Verified — `grep -rln "delete_tenant\|purge\|retention\|ttl\|expire" backend/` returns no hits outside test fixtures.
+Whole-tenant deletion is now **built** (2026-07-17). The line it draws is constitutional and worth stating precisely: removing an *entire* tenant's append-only stream as a unit is the "discard the whole logbook" case — legitimate — while editing or partially deleting a *live* stream ("tear one page out") remains forbidden. The database enforces exactly this: `decision_events`' `forbid_history_mutation` trigger still blocks every UPDATE and every ordinary DELETE, and permits a DELETE only inside a transaction that has declared, via the `kernl.purging_tenant` session variable, that this specific tenant is being purged — and only for rows whose own `company_id` matches that declaration, so purging tenant A can never reach tenant B's rows.
 
-| Data | Where | Why it should be prunable | Current mechanism |
-|---|---|---|---|
-| Throwaway smoke/stress-test tenants (`smoke-<hex>`, `stress-<hex>`, `load-<hex>`) | Full tenant rows + their ledger/bundle/case data | Created by every run of `scripts/smoke_test.py` / `scripts/stress_test.py`. Purely diagnostic; this session alone created a dozen+ against live Supabase. Left unmanaged, they accumulate forever and pollute tenant listings. | None. `POST /v1/tenants` has no corresponding `DELETE`. |
-| Abandoned draft bundles (never assembled/published) | `onboarding_drafts`, unassembled bundle records | A rejected or forgotten draft has no evidentiary value once superseded by a real published bundle. | None — drafts persist indefinitely regardless of status. |
-| Source documents uploaded for grounding | `source_files` / `PgSourceStore` | May contain sensitive business text (refund policies, SOPs) uploaded during onboarding. Once a citation is grounded and the bundle published, the *citation* (source_id + span + excerpt) is what the ledger needs permanently — the full raw document is not. | None. |
+| Data | Where | Status |
+|---|---|---|
+| Throwaway smoke/stress-test tenants (`smoke-<hex>`, `stress-<hex>`, `load-<hex>`) | Full tenant rows + ledger/bundle/case data | **Handled.** `DELETE /v1/tenants/{id}` (admin-gated) purges a whole tenant across every V1 table in one transaction. `scripts/smoke_test.py` and `scripts/stress_test.py` self-clean on a passing run (and deliberately KEEP the tenant, printing its id, on failure so it can be inspected). |
+| Abandoned draft bundles (never assembled/published) | `onboarding_drafts`, unassembled bundle records | Purged as part of whole-tenant deletion. Still no per-draft TTL for a *live* tenant — a low-priority future nicety, not a correctness gap. |
+| Source documents uploaded for grounding | `source_snapshots` / `PgSourceStore` | Purged as part of whole-tenant deletion. Note the citation (source_id + span + excerpt) lives in the bundle/ledger regardless; the raw snapshot is what deletion removes. Minimizing what's uploaded in the first place is still the better lever for sensitive text. |
 
-**Direction for closing this gap** (not built in V1, scoped for whoever picks this up next):
-1. A `DELETE /v1/tenants/{id}` endpoint gated the same way provisioning is (admin key), for full removal of non-production tenants. Straightforward — nothing about deleting an *entire* tenant's data violates the "no mutation of history" rule, because no partial/selective edit is happening; the whole append-only stream is being removed as a unit, the same way you can discard an entire logbook without it meaning you can tear out one page.
-2. `scripts/smoke_test.py` / `scripts/stress_test.py` should self-clean on success (call the above endpoint at the end of a passing run) and print the tenant ID prominently on failure so a human can inspect before it's cleaned up manually.
-3. A documented sweep (manual or scheduled) for `smoke-*`/`stress-*`/`load-*` tenants older than N days, once the delete endpoint exists.
+**Operational sweep** (retention §3.3): with the delete endpoint live, purging accumulated `smoke-*`/`stress-*`/`load-*`/`probe-*` tenants is a one-liner over `GET /v1/tenants` + `DELETE /v1/tenants/{id}` filtered to those prefixes. Real corpora (`rivanly-inc`, `higgsfield`) and any production tenant are never matched by that filter. This was run once on 2026-07-17 to clear ~30 accumulated test tenants; a scheduled version (cron) is a trivial future addition if test volume warrants it.
 
 ---
 
@@ -63,7 +60,7 @@ Until one of the above is built, the operational answer to "we got an erasure re
 
 ## 5. API keys
 
-Owner/approver/agent keys (`kk_...`) are stored only as hashes (`v1_api.py` — plaintext is shown once at provisioning, never again). There is currently no key rotation or revocation endpoint. Direction: a `POST /v1/tenants/{id}/keys` (issue) + `DELETE /v1/tenants/{id}/keys/{key_id}` (revoke) pair, following the same "keys, not the account, are revocable" pattern most API platforms use — out of scope to build speculatively here, noted so it's not forgotten.
+Owner/approver/agent keys (`kk_...`) are stored only as hashes (`backend/onboarding/tenants.py` — plaintext is shown once at issue, never again). Rotation is now **built** (2026-07-17): `POST /v1/tenants/{id}/keys` issues a new key (any role), `GET /v1/tenants/{id}/keys` lists keys as metadata only (never plaintext or hash), and `DELETE /v1/tenants/{id}/keys/{key_id}` revokes one. All three are owner-scoped to the caller's own tenant. The rotation flow is issue-then-revoke, and the revoke endpoint refuses to remove the **last active owner key** — that would lock the tenant out of its own administration, so a replacement owner key must be issued first. Revocation is idempotent, and a revoked key stops resolving immediately (`find_by_hash` filters `revoked_at IS NOT NULL`). Every issue/revoke is structured-logged (`tenant.key_issued` / `tenant.key_revoked`) with the acting key id.
 
 ---
 
