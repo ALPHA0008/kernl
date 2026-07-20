@@ -8,11 +8,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy backend requirements first to leverage Docker cache
-COPY backend/requirements.txt .
-
-# Install python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install ONLY the /v1 runtime deps -- not the retired legacy ML chain
+# (sentence-transformers/torch/langgraph), which the live server imports none
+# of. Keeps the image small and free of the numpy/pandas ABI fragility. Use
+# backend/requirements.txt for dev/eval; the container needs requirements-serve.
+COPY backend/requirements-serve.txt .
+RUN pip install --no-cache-dir -r requirements-serve.txt
 
 # Copy backend codebase
 COPY backend/ ./backend/
@@ -35,5 +36,7 @@ ENV PYTHONPATH=/app
 ENV PORT=7860
 EXPOSE 7860
 
-# Shell form so ${PORT} expands. uvicorn binds whatever HF provides.
-CMD uvicorn backend.api:app --host 0.0.0.0 --port ${PORT}
+# JSON exec form for clean OS-signal handling; `exec` replaces the shell so
+# uvicorn is PID 1 and receives SIGTERM directly (graceful shutdown), while
+# `sh -c` still expands ${PORT} at runtime (HF injects it; default 7860 above).
+CMD ["sh", "-c", "exec uvicorn backend.api:app --host 0.0.0.0 --port ${PORT}"]

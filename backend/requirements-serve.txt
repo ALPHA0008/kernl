@@ -1,0 +1,25 @@
+# Runtime dependencies for the /v1 server ONLY (what the deployed container needs).
+#
+# The full backend/requirements.txt also carries the RETIRED legacy extraction
+# chain -- sentence-transformers -> transformers -> torch (~1GB+), sklearn,
+# pandas, langgraph -- which the live /v1 API imports NONE of at runtime
+# (verified: `import backend.api` loads zero of those modules). Shipping them in
+# the production image is pure bloat AND reintroduces the numpy/pandas ABI
+# fragility we pinned around. This file is the honest runtime surface: install
+# it in the container; use the full requirements.txt only for dev/eval/legacy
+# work. CI's guard step asserts /v1 never re-couples to that chain, so this stays
+# safe over time.
+# fastapi/starlette pinned to the tested 0.x line. An unpinned `fastapi>=0.115`
+# resolves to fastapi 0.139 + starlette 1.x, whose route-mounting behavior
+# differs from what the 168-test suite was validated against. The app still
+# serves under 1.x, but production should run the exact major we test, not
+# whatever pip resolves on build day.
+fastapi>=0.115,<0.140
+starlette<1.0
+uvicorn[standard]
+pydantic
+psycopg[binary]>=3.2
+python-dotenv
+python-multipart
+httpx
+cryptography>=42

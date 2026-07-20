@@ -47,7 +47,12 @@ from backend.bundle.schema import (
     Policy,
     WorkflowSpec,
 )
-from backend.runtime.evaluator import PolicyStatus, evaluate
+from backend.runtime.evaluator import (
+    EscalationReason,
+    OutcomeKind,
+    PolicyStatus,
+    evaluate,
+)
 
 WORKFLOW = "wf"
 _DUMMY_EVIDENCE = (
@@ -214,6 +219,129 @@ def test_property_effective_facts_are_declared_fields_only(b, f):
     declared = set(FIELD_NAMES)
     assert set(result.trace.facts_effective.keys()) <= declared
     assert set(result.trace.facts_ignored) <= set(facts.keys())
+
+
+# ---------------------------------------------------------------------------
+# "Zero unexplained rulings" -- the arc's V1 release criterion, as a test.
+#
+# Every ruling the evaluator can emit must carry a complete, self-consistent
+# derivation in its trace. Not "has a trace field" -- the trace must actually
+# EXPLAIN this specific outcome: a decisive ruling names a winning policy that
+# is present, matched, and whose action it carries; an escalation gives a
+# concrete reason substantiated by the trace; and the precedence record agrees
+# with the outcome. This is asserted over GENERATED bundles/facts (so it holds
+# for inputs no author wrote by hand) and, in test_evaluator/test_seed_*,
+# against the real corpora.
+
+
+def _assert_ruling_is_explained(result) -> None:
+    """The completeness contract for a single evaluation. Raises AssertionError
+    with a specific message on the first gap, so a Hypothesis counterexample
+    points straight at the unexplained ruling.
+
+    The load-bearing distinction: a ruling is DECISIVE (a policy matched and
+    its effect governs) exactly when escalation_reason is None -- this includes
+    escalate-EFFECT policies like 'enterprise refund -> escalate to AM', which
+    are deliberate matched rulings, NOT the evaluator failing to rule. A ruling
+    is a SYSTEM ESCALATION (the evaluator couldn't rule) exactly when
+    escalation_reason is set. So the discriminator is escalation_reason, never
+    the outcome KIND (an escalate-kind outcome can be either)."""
+    outcome = result.outcome
+    trace = result.trace
+    by_id = {pe.policy_id: pe for pe in trace.policies}
+
+    # (1) Every ruling shows its work: every policy in the bundle appears in the
+    #     trace with a per-condition breakdown (expected/actual/result).
+    for pe in trace.policies:
+        for cr in pe.conditions:
+            assert cr.result in ("pass", "fail", "missing"), (
+                f"{pe.policy_id}: condition result {cr.result!r} is not one of "
+                "pass/fail/missing"
+            )
+
+    is_system_escalation = outcome.escalation_reason is not None
+
+    if not is_system_escalation:
+        # (2) A decisive ruling (approve/deny/route OR an escalate-effect policy)
+        #     is explained by a concrete winning policy that matched.
+        assert outcome.policy_id is not None, (
+            f"decisive outcome {outcome.kind} names no winning policy -- unexplained"
+        )
+        winner = by_id.get(outcome.policy_id)
+        assert winner is not None, (
+            f"winning policy {outcome.policy_id!r} is absent from the trace"
+        )
+        assert winner.status is PolicyStatus.MATCHED, (
+            f"winning policy {outcome.policy_id!r} is {winner.status}, not MATCHED"
+        )
+        assert outcome.action is not None, "decisive outcome carries no action"
+        # the precedence record must agree on the winner
+        assert trace.precedence.winner == outcome.policy_id, (
+            f"precedence winner {trace.precedence.winner!r} disagrees with "
+            f"outcome policy {outcome.policy_id!r}"
+        )
+
+    else:
+        # (3) A system escalation is explained by a concrete, substantiated
+        #     reason, and names no winning policy (it IS the no-ruling case).
+        assert outcome.kind is OutcomeKind.ESCALATE, (
+            f"escalation_reason is set but outcome kind is {outcome.kind}, "
+            "not escalate"
+        )
+        assert outcome.policy_id is None and outcome.action is None, (
+            "a system escalation must not also name a winning policy/action"
+        )
+        reason = outcome.escalation_reason
+
+        if reason is EscalationReason.MISSING_FACTS:
+            # some policy that could otherwise govern was blocked by a missing
+            # fact -> the trace must record at least one 'missing' condition or a
+            # dominance block.
+            has_missing = any(
+                cr.result == "missing"
+                for pe in trace.policies for cr in pe.conditions
+            )
+            blocked = bool(trace.precedence.dominance_blocked_by)
+            assert has_missing or blocked, (
+                "escalation reason is missing_facts but the trace shows no missing "
+                "condition and no dominance block to substantiate it"
+            )
+        elif reason is EscalationReason.NO_MATCHING_POLICY:
+            matched = [pe for pe in trace.policies if pe.status is PolicyStatus.MATCHED]
+            assert not matched, (
+                "escalation reason is no_matching_policy but the trace HAS matched "
+                f"policies: {[pe.policy_id for pe in matched]}"
+            )
+        elif reason is EscalationReason.CONFLICT:
+            # a genuine tie between equally-ranked matched policies, recorded.
+            assert trace.precedence.tie_between, (
+                "escalation reason is conflict but precedence records no tie_between"
+            )
+            assert len(trace.precedence.tie_between) >= 2
+        else:  # pragma: no cover - EscalationReason is a closed enum
+            raise AssertionError(f"unknown escalation reason {reason!r}")
+
+
+@given(b=bundles(), f=st.data())
+@_SETTINGS
+def test_property_zero_unexplained_rulings(b, f):
+    """Every generated ruling carries a complete derivation (arc V1 release
+    criterion: 'zero unexplained rulings')."""
+    facts = f.draw(facts_for())
+    _assert_ruling_is_explained(evaluate(facts, b, WORKFLOW))
+
+
+def test_zero_unexplained_rulings_on_real_corpora():
+    """The same completeness contract, against BOTH seeded reference bundles and
+    every one of their golden-case fact sets -- real authored policy, not just
+    generated shapes."""
+    from backend.bundle import seed_higgsfield, seed_rivanly
+
+    for seed in (seed_rivanly, seed_higgsfield):
+        bundle = seed.build_bundle()
+        for case in seed.build_golden_cases():
+            result = evaluate(case.facts, bundle, case.workflow)
+            _assert_ruling_is_explained(result)
 
 
 # ---------------------------------------------------------------------------

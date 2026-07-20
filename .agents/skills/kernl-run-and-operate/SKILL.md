@@ -37,6 +37,7 @@ uvicorn backend.api:app --host 127.0.0.1 --port 8000
 | `KERNL_DB_URL` (or `SUPABASE_DB_URL`) | Set -> Postgres adapters, real persistence. Unset -> in-memory reference stores (fine for dev/tests, **volatile — data is lost on restart**). |
 | `KERNL_ADMIN_KEY` | Gates `POST /v1/tenants`. **Unset = provisioning is closed** (fails closed, not open) — you cannot create a new tenant without it. |
 | `KERNL_API_KEYS` | Static bootstrap tenant keys: `"<key>:<company_id>:<role>[,...]"`, roles are `owner`\|`approver`\|`agent`. Optional — tenants provisioned via `/v1/tenants` get DB-backed keys instead. |
+| `KERNL_SIGNING_KEY` | Ed25519 private key (64 hex chars) used to sign published bundles. Generate with `python -m backend.bundle.signing`. **Unset -> bundles publish UNSIGNED** (explicitly recorded as such; `/v1/bundles/active` reports `signed:false`). Set it in production; the absence is visible, never silent. The matching public key is returned on every bundle response (`signing_pubkey`) so verifiers need no separate distribution. |
 
 **Health check:**
 ```bash
@@ -185,7 +186,7 @@ From this session's actual load testing (`scripts/stress_test.py`), not estimate
 
 **Backend → Hugging Face Spaces** (if still targeting this): Space is configured by `README.md` frontmatter (`sdk: docker`, `app_port: 7860`). The Dockerfile now binds `${PORT:-7860}` and `EXPOSE`s 7860, matching the frontmatter — HF routes external traffic to `app_port` (7860) and the container listens there. (Reconciled 2026-07-17; it previously bound 8081 while the README said 7860, so the Space was unreachable.)
 
-**Secrets:** never bake credentials into the image or README. Set `KERNL_DB_URL`, `KERNL_ADMIN_KEY`, `KERNL_API_KEYS` via the platform's secret store only. A Hugging Face token was leaked in git history (commit 22ee2f0, old `backend/llm.py`) — treat as compromised, do not reproduce it.
+**Secrets:** never bake credentials into the image or README. Set `KERNL_DB_URL`, `KERNL_ADMIN_KEY`, `KERNL_API_KEYS`, `KERNL_SIGNING_KEY` via the platform's secret store only. A Hugging Face token was leaked in git history (commit 22ee2f0, old `backend/llm.py`) — treat as compromised, do not reproduce it.
 
 **Frontend.** Next.js app under `frontend/`. `npm run build && npm run start` for production serving — **`npm run dev` has a known Turbopack root-inference issue on some Windows/Git-Bash setups; if it crash-loops or spawns runaway processes, verify `frontend/next.config.ts` has `turbopack.root` pinned** (fixed 2026-07-16). Points at `NEXT_PUBLIC_KERNL_API_URL`, defaulting to `http://127.0.0.1:8000`.
 
