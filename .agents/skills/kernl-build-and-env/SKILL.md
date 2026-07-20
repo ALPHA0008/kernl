@@ -154,13 +154,13 @@ npm run build && npm run start    # production mode -- see the dev-mode trap bel
 
 ## 7. Docker and Hugging Face Spaces
 
-Root `Dockerfile`: `python:3.11-slim` base, installs `backend/requirements.txt`, copies `backend/` and `data/`, sets `PYTHONPATH=/app`, `EXPOSE 8081`, runs:
+Root `Dockerfile`: `python:3.11-slim` base, installs `backend/requirements.txt`, copies `backend/` and `data/`, sets `PYTHONPATH=/app`, `EXPOSE 7860`, and binds `${PORT:-7860}`:
 
 ```
-uvicorn backend.api:app --host 0.0.0.0 --port 8081
+uvicorn backend.api:app --host 0.0.0.0 --port ${PORT}
 ```
 
-**Known break, unresolved:** `README.md`'s HF Spaces frontmatter declares `app_port: 7860` while the Dockerfile serves on `8081`. HF Spaces routes traffic to `app_port` — with this mismatch the Space cannot reach the app. Reconcile one side before deploying (via `kernl-change-control`, not ad hoc).
+Ports are aligned on **7860**: `README.md`'s HF frontmatter declares `app_port: 7860`, and the Dockerfile `EXPOSE`s 7860 and binds `${PORT:-7860}` (HF injects `PORT` at runtime). HF routes external traffic to `app_port`, which the container now listens on. (Reconciled 2026-07-17; it previously bound 8081 while the README said 7860, so the Space was unreachable.)
 
 **PYTHONPATH mirror:** locally, always run from the repo root so `backend.*` imports resolve the same way the container's `PYTHONPATH=/app` does.
 
@@ -199,5 +199,5 @@ Facts verified directly against the repo on **2026-07-16**. Re-verify volatile f
 | Schema table count | `grep -c "CREATE TABLE" backend/schema.sql` |
 | Seed corpus status | `grep -c "^\s*_case(" backend/bundle/seed_rivanly.py`; check `data/sources/higgsfield/` for a seed script |
 | Turbopack root pin | `grep -n "turbopack" frontend/next.config.ts` |
-| Docker/HF port mismatch | `grep -n "port\|EXPOSE" Dockerfile; head -9 README.md` |
+| Docker/HF port aligned on 7860 | `grep -n "PORT\|EXPOSE" Dockerfile; head -9 README.md` |
 | Leaked-token commit (do not print contents) | `git log --oneline 22ee2f0 -1` |

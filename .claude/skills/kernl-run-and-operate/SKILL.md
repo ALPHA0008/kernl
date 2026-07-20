@@ -44,7 +44,7 @@ curl http://127.0.0.1:8000/v1/health
 ```
 `{"status": "ok"}` if the process is up and the container initialized. This does NOT ping the DB — a DB outage surfaces as a 503 on the first request that needs storage, not on `/v1/health`.
 
-Note the port mismatch in the repo: `Dockerfile` still `EXPOSE`s 8081 and `README.md`'s HF Space frontmatter says `app_port: 7860` — those disagree with each other and with the 8000 used throughout this skill's runbooks and `scripts/smoke_test.py`/`scripts/stress_test.py`. Reconcile before trusting a container deploy; locally, any free port works as long as `--port` and your client agree.
+Ports: the Dockerfile and `README.md` frontmatter now agree on **7860** (the HF Spaces convention; the Dockerfile honors `$PORT` and falls back to 7860). This skill's local runbooks use **8000** purely by convention — locally, any free port works as long as `--port` and your client agree. (Historical note: the Dockerfile used to hardcode 8081 while the README said 7860, so HF forwarded to a dead port; reconciled 2026-07-17.)
 
 ---
 
@@ -183,7 +183,7 @@ From this session's actual load testing (`scripts/stress_test.py`), not estimate
 
 ## 8. Deploy
 
-**Backend → Hugging Face Spaces** (if still targeting this): Space is configured by `README.md` frontmatter (`sdk: docker`, `app_port: 7860`). Dockerfile currently `EXPOSE`s and binds 8081 — **reconcile this before deploying**, HF will forward to 7860 where nothing listens as the Dockerfile stands. This is a pre-existing mismatch, not something introduced by V1.
+**Backend → Hugging Face Spaces** (if still targeting this): Space is configured by `README.md` frontmatter (`sdk: docker`, `app_port: 7860`). The Dockerfile now binds `${PORT:-7860}` and `EXPOSE`s 7860, matching the frontmatter — HF routes external traffic to `app_port` (7860) and the container listens there. (Reconciled 2026-07-17; it previously bound 8081 while the README said 7860, so the Space was unreachable.)
 
 **Secrets:** never bake credentials into the image or README. Set `KERNL_DB_URL`, `KERNL_ADMIN_KEY`, `KERNL_API_KEYS` via the platform's secret store only. A Hugging Face token was leaked in git history (commit 22ee2f0, old `backend/llm.py`) — treat as compromised, do not reproduce it.
 
@@ -204,6 +204,6 @@ Facts verified against the repo on **2026-07-16**. Re-verify volatile facts befo
 | Legacy surface fully retired | `grep -n "_RETIRED_LEGACY_ROUTES" backend/api.py` |
 | Chain-conflict retry bound | `grep -n "_MAX_CHAIN_CONFLICT_RETRIES" backend/ledger/service.py` |
 | numpy pin | `grep -n "numpy" backend/requirements.txt` |
-| Dockerfile/HF port mismatch | `grep -n "port\|EXPOSE" Dockerfile; head -9 README.md` |
+| Dockerfile/HF port aligned on 7860 | `grep -n "PORT\|EXPOSE" Dockerfile; head -9 README.md` |
 | Turbopack root fix | `grep -n "turbopack" frontend/next.config.ts` |
 | Leaked-token commit (do not print contents) | `git log --oneline 22ee2f0 -1` |

@@ -26,6 +26,14 @@ RUN mkdir -p /app/data/sources && chmod -R 777 /app/data
 # Set PYTHONPATH so Python can locate our backend module
 ENV PYTHONPATH=/app
 
-EXPOSE 8081
+# Port: 7860 is the Hugging Face Spaces convention and matches this repo's
+# README frontmatter (app_port: 7860), which is where HF routes external
+# traffic. HF also injects a PORT env var at runtime; honor it if present,
+# fall back to 7860 otherwise. (Previously the Dockerfile hardcoded 8081
+# while the README declared 7860 -- HF forwarded to 7860 where nothing
+# listened, so the Space was unreachable. Reconciled on 7860.)
+ENV PORT=7860
+EXPOSE 7860
 
-CMD ["uvicorn", "backend.api:app", "--host", "0.0.0.0", "--port", "8081"]
+# Shell form so ${PORT} expands. uvicorn binds whatever HF provides.
+CMD uvicorn backend.api:app --host 0.0.0.0 --port ${PORT}
