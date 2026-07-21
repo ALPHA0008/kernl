@@ -1,0 +1,170 @@
+[
+  {
+    "channel": "support-escalations",
+    "user": "priya.k",
+    "text": "Hey team, got a weird one. Customer @TechVault_Marcus has been with us 18 months, annual plan, day 47 of their cycle. Says they upgraded to the wrong plan tier by mistake and wants a full refund to downgrade. Technically outside our 14-day window. What do we do?",
+    "ts": "1740832200",
+    "thread_id": "thread_001"
+  },
+  {
+    "channel": "support-escalations",
+    "user": "daniel.ops",
+    "text": "Marcus is one of our oldest customers, $1,800/year. Go ahead and approve the prorated refund on this one. We've done this for tenured customers before — if they're past 12 months with us and it's a genuine mistake, we have discretion. Just log it.",
+    "ts": "1740833100",
+    "thread_id": "thread_001"
+  },
+  {
+    "channel": "support-escalations",
+    "user": "priya.k",
+    "text": "Got it — approving prorated refund for Marcus. Logging as 'loyalty exception - annual customer >12 months, genuine plan confusion'",
+    "ts": "1740833400",
+    "thread_id": "thread_001"
+  },
+  {
+    "channel": "support-escalations",
+    "user": "james.csr",
+    "text": "Quick q — we have Meridian Corp (enterprise) asking about refunding last month's overage charges. Their AE is on PTO, can I just approve it? It's only $340.",
+    "ts": "1740918600",
+    "thread_id": "thread_002"
+  },
+  {
+    "channel": "support-escalations",
+    "user": "sarah.lead",
+    "text": "No — enterprise refunds always need AE sign-off, PTO doesn't matter. Ping Jake directly on his mobile, number is in the AE emergency list. This is exactly the kind of thing where we've gotten burned before.",
+    "ts": "1740919200",
+    "thread_id": "thread_002"
+  },
+  {
+    "channel": "support-escalations",
+    "user": "james.csr",
+    "text": "Understood. Reaching out to Jake now.",
+    "ts": "1740919500",
+    "thread_id": "thread_002"
+  },
+  {
+    "channel": "support-escalations",
+    "user": "priya.k",
+    "text": "Fraud flag question: user signed up 5 days ago, generated about 200 videos in 3 days, now requesting full refund claiming 'quality not as expected'. They're on the $99/mo plan. Usage is at 85%. Do we approve?",
+    "ts": "1741004200",
+    "thread_id": "thread_003"
+  },
+  {
+    "channel": "support-escalations",
+    "user": "sarah.lead",
+    "text": "New account + high usage + refund request = fraud review before anything. Escalate to trust and safety, freeze the account pending review. Do NOT approve or deny until we hear back. Tag @trust-safety in the ticket.",
+    "ts": "1741004800",
+    "thread_id": "thread_003"
+  },
+  {
+    "channel": "support-escalations",
+    "user": "tom.billing",
+    "text": "Enterprise customer Vexon Labs is asking if we can extend their credits that expired last week. Their contract lapsed temporarily while renewal was being negotiated. CFO approved the renewal yesterday, contract signed this morning.",
+    "ts": "1741090500",
+    "thread_id": "thread_004"
+  },
+  {
+    "channel": "support-escalations",
+    "user": "daniel.ops",
+    "text": "This is a contract gap situation — totally different from normal credit expiry. Restore their credits, full amount. Get AE to confirm the contract is active in Salesforce first, then do the restore. Don't wait on this, they're a $50k account.",
+    "ts": "1741091100",
+    "thread_id": "thread_004"
+  },
+  {
+    "channel": "support-escalations",
+    "user": "tom.billing",
+    "text": "AE confirmed, restoring now.",
+    "ts": "1741091400",
+    "thread_id": "thread_004"
+  },
+  {
+    "channel": "support-escalations",
+    "user": "lily.support",
+    "text": "Monthly subscriber asking for refund on day 3 of their cycle. Says the platform doesn't support the resolution they need. Totally valid complaint actually — we don't support 8K output yet. What's the right call here?",
+    "ts": "1741176000",
+    "thread_id": "thread_005"
+  },
+  {
+    "channel": "support-escalations",
+    "user": "sarah.lead",
+    "text": "If they're within 48 hours, process the refund normally. If it's day 3 they're technically outside the window, but if the complaint is about a genuine capability gap we documented incorrectly — give them the full refund anyway. We can't hold people to policy if our docs misled them. Log it as 'product misrepresentation - capability gap'.",
+    "ts": "1741176600",
+    "thread_id": "thread_005"
+  },
+  {
+    "channel": "support-escalations",
+    "user": "lily.support",
+    "text": "Day 3 is within 72 hours so technically close. Processing full refund, logging as you said.",
+    "ts": "1741176900",
+    "thread_id": "thread_005"
+  },
+  {
+    "channel": "support-escalations",
+    "user": "james.csr",
+    "text": "We got a churn signal cluster — Nexaform account: last login was 18 days ago, they have an open ticket from 2 weeks back still unresolved, and their credit usage is at 8% with 4 days left in cycle. Their MRR is $450/mo annual. At-risk?",
+    "ts": "1741262400",
+    "thread_id": "thread_006"
+  },
+  {
+    "channel": "support-escalations",
+    "user": "sarah.lead",
+    "text": "Three signals in 30 days = at-risk by definition. Annual Pro so this needs a CSM touch, not just automated emails. Get the unresolved ticket closed first — that's probably why they ghosted. Then schedule a check-in. Do not let this become a cancellation.",
+    "ts": "1741263000",
+    "thread_id": "thread_006"
+  },
+  {
+    "channel": "support-escalations",
+    "user": "priya.k",
+    "text": "Weird content moderation case: user generated a video of a public figure (news anchor) in a clearly satirical context with a visible watermark and '#satire' in the title. Is this a Tier 1 violation?",
+    "ts": "1741348800",
+    "thread_id": "thread_007"
+  },
+  {
+    "channel": "support-escalations",
+    "user": "daniel.ops",
+    "text": "If the watermark is clearly visible and it's satire, this falls under protected speech. Not a violation. But document it in the content review log so if they escalate to something non-satirical we have the history. No warning this time.",
+    "ts": "1741349400",
+    "thread_id": "thread_007"
+  },
+  {
+    "channel": "support-escalations",
+    "user": "tom.billing",
+    "text": "Enterprise account (Cloudtide) asked me directly to cancel their subscription 'as soon as possible'. They said they want to 'pause things for now'. Should I just process the cancellation?",
+    "ts": "1741435200",
+    "thread_id": "thread_008"
+  },
+  {
+    "channel": "support-escalations",
+    "user": "sarah.lead",
+    "text": "DO NOT cancel enterprise. 'Pause' is code for 'we might churn' — send directly to their AE immediately. Enterprise contracts have a 30-day written notice clause anyway so you can't just cancel same-day. Let the AE handle retention conversation.",
+    "ts": "1741435800",
+    "thread_id": "thread_008"
+  },
+  {
+    "channel": "support-escalations",
+    "user": "lily.support",
+    "text": "Got a reactivation request from a customer who churned 3 months ago. They want to know if we can restore their old videos and project history.",
+    "ts": "1741521600",
+    "thread_id": "thread_009"
+  },
+  {
+    "channel": "support-escalations",
+    "user": "daniel.ops",
+    "text": "3 months is right on the edge of our 90-day data retention. Check if their data is still in the system. If yes, restore it and give them 50% off first month back — standard win-back. If data is gone, be honest about it and offer a clean start with 50% off anyway. Don't promise data restoration before you've checked.",
+    "ts": "1741522200",
+    "thread_id": "thread_009"
+  },
+  {
+    "channel": "support-escalations",
+    "user": "james.csr",
+    "text": "Quick heads up — I approved a credit extension for a customer whose credits expired 4 days ago. They were Pro annual, claimed they forgot to use them. I gave them a 14-day extension. Was that right?",
+    "ts": "1741608000",
+    "thread_id": "thread_010"
+  },
+  {
+    "channel": "support-escalations",
+    "user": "sarah.lead",
+    "text": "Honestly not by the book — policy says credits expire 90 days after subscription end, no extensions. But it's done now and 14 days isn't a huge deal. Going forward: pro annual credit extensions need my approval first. Don't want to set a precedent where everyone asks for extensions.",
+    "ts": "1741608600",
+    "thread_id": "thread_010"
+  }
+]

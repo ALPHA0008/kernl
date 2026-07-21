@@ -1,0 +1,177 @@
+[
+  {
+    "channel": "incidents",
+    "user": "ravi.oncall",
+    "text": "🚨 P0 DECLARED — Generation pipeline down. API returning 503 on all /generate endpoints. Started approximately 14:32 PT. Investigating now.",
+    "ts": "1740920400",
+    "thread_id": "thread_i001"
+  },
+  {
+    "channel": "incidents",
+    "user": "ravi.oncall",
+    "text": "Update 14:47 PT: Traced to model inference cluster — one of three GPU nodes went unresponsive. Failing over traffic to remaining nodes. Generation partially restored, expect full restore in 10 mins.",
+    "ts": "1741005000",
+    "thread_id": "thread_i001"
+  },
+  {
+    "channel": "incidents",
+    "user": "nina.eng",
+    "text": "Status page updated. Enterprise customers being notified via AE channel.",
+    "ts": "1741005300",
+    "thread_id": "thread_i001"
+  },
+  {
+    "channel": "incidents",
+    "user": "ravi.oncall",
+    "text": "✅ P0 RESOLVED 14:58 PT. All generation endpoints nominal. Total downtime: 26 minutes. Post-mortem scheduled tomorrow 10am PT. Root cause: GPU node OOM due to unusually large batch job from enterprise account — no rate limiting on batch size.",
+    "ts": "1741005960",
+    "thread_id": "thread_i001"
+  },
+  {
+    "channel": "incidents",
+    "user": "nina.eng",
+    "text": "P1 flag — enterprise customer Meridian Corp reporting generation latency of 45-60 seconds consistently (baseline is 12-15s). Only affecting their account, other enterprise accounts normal. Looks account-specific.",
+    "ts": "1741091700",
+    "thread_id": "thread_i002"
+  },
+  {
+    "channel": "incidents",
+    "user": "dev.sre",
+    "text": "Looking into it. Their account has an unusual number of concurrent requests from what looks like an automated pipeline they're running. Not hitting rate limits but saturating their queue allocation.",
+    "ts": "1741092000",
+    "thread_id": "thread_i002"
+  },
+  {
+    "channel": "incidents",
+    "user": "dev.sre",
+    "text": "Fixed — adjusted their queue allocation. Latency back to 13s. AE notified. No SLA breach since we caught it at 28 minutes into the degradation window (P1 SLA is 4 hours).",
+    "ts": "1741093800",
+    "thread_id": "thread_i002"
+  },
+  {
+    "channel": "bugs",
+    "user": "priya.k",
+    "text": "Customer ticket from Vexon Labs — enterprise. They're saying their API key stopped working after they rotated it from the dashboard. New key generates fine but returns 401 on all requests. Reproducible.",
+    "ts": "1741178400",
+    "thread_id": "thread_b001"
+  },
+  {
+    "channel": "bugs",
+    "user": "ravi.oncall",
+    "text": "Triaging now — this sounds like a P1 since it's enterprise with a broken API key. Reproducing locally.",
+    "ts": "1741178700",
+    "thread_id": "thread_b001"
+  },
+  {
+    "channel": "bugs",
+    "user": "ravi.oncall",
+    "text": "Confirmed bug. Key rotation has a race condition — new key isn't propagated to all auth nodes for up to 90 seconds after rotation. Workaround: wait 2 minutes after rotation before using new key. Pushed hotfix to staging.",
+    "ts": "1741180200",
+    "thread_id": "thread_b001"
+  },
+  {
+    "channel": "bugs",
+    "user": "nina.eng",
+    "text": "Hotfix approved. Deploying now — this qualifies as P1 hotfix so we're going outside the normal deployment window. Head of Engineering approved.",
+    "ts": "1741181100",
+    "thread_id": "thread_b001"
+  },
+  {
+    "channel": "bugs",
+    "user": "ravi.oncall",
+    "text": "Hotfix live. Customer notified. Vexon Labs confirmed working.",
+    "ts": "1741182000",
+    "thread_id": "thread_b001"
+  },
+  {
+    "channel": "bugs",
+    "user": "sanjay.dev",
+    "text": "Three different users reported the same issue today — when you export a video with custom watermark, the watermark positioning is off by about 40px on 16:9 aspect ratio. All reported within the last 4 hours.",
+    "ts": "1741264800",
+    "thread_id": "thread_b002"
+  },
+  {
+    "channel": "bugs",
+    "user": "nina.eng",
+    "text": "3 distinct users in 4 hours = P1 by triage rules. Assigning to sanjay since you already have context. What's the repro?",
+    "ts": "1741265100",
+    "thread_id": "thread_b002"
+  },
+  {
+    "channel": "bugs",
+    "user": "sanjay.dev",
+    "text": "Repro: 16:9 video, add watermark at 'bottom-right', export. Watermark appears 40px too far left. Introduced in last week's frontend deploy. Not affecting 9:16 or 1:1.",
+    "ts": "1741265400",
+    "thread_id": "thread_b002"
+  },
+  {
+    "channel": "deployment",
+    "user": "nina.eng",
+    "text": "Heads up — I'm going to push a quick CSS fix for the watermark bug. It's a 3-line change. Can someone do a fast review?",
+    "ts": "1741351200",
+    "thread_id": "thread_d001"
+  },
+  {
+    "channel": "deployment",
+    "user": "ravi.oncall",
+    "text": "Reviewed and approved. But this is Friday at 3:15pm PT — do you want to wait until Tuesday or call it a P1 hotfix? P1 hotfixes need Head of Eng approval to deploy outside window.",
+    "ts": "1741351500",
+    "thread_id": "thread_d001"
+  },
+  {
+    "channel": "deployment",
+    "user": "nina.eng",
+    "text": "Good call. 3 users affected, it's a UI issue not critical infra. I'll wait until Tuesday. Documenting as P2, not P1 in hindsight — no enterprise customers affected.",
+    "ts": "1741351800",
+    "thread_id": "thread_d001"
+  },
+  {
+    "channel": "engineering-ops",
+    "user": "dev.sre",
+    "text": "Quarterly backup restoration test done. Took 1hr 42mins to restore the last full backup to test environment. Under our 2hr RTO target. All data verified intact. Logging in the ops doc.",
+    "ts": "1741438200",
+    "thread_id": "thread_ops001"
+  },
+  {
+    "channel": "engineering-ops",
+    "user": "ravi.oncall",
+    "text": "Security note: found that our staging environment was accidentally using a production API key for the analytics integration for the past 2 weeks. No external exposure but it means staging analytics were being written to prod. Rotated the key, staging now uses its own. Notifying Head of Eng.",
+    "ts": "1741524600",
+    "thread_id": "thread_ops002"
+  },
+  {
+    "channel": "engineering-ops",
+    "user": "marcos.head_eng",
+    "text": "Good catch. This is technically a High severity security incident per policy since internal credentials were misused. Logging it formally. No customer data was affected. CTO notified per protocol.",
+    "ts": "1741525200",
+    "thread_id": "thread_ops002"
+  },
+  {
+    "channel": "bugs",
+    "user": "james.csr",
+    "text": "Enterprise customer NovaStar reporting that their webhook deliveries have been failing silently for 3 days. They only noticed because they were checking their internal logs. No alert was triggered on our side.",
+    "ts": "1741611600",
+    "thread_id": "thread_b003"
+  },
+  {
+    "channel": "bugs",
+    "user": "dev.sre",
+    "text": "This is a P1 — silent failure for enterprise customer, 3 days undetected. We have a monitoring gap here. Fixing the webhook delivery now, adding alerting for consecutive delivery failures >3. AE notified?",
+    "ts": "1741611900",
+    "thread_id": "thread_b003"
+  },
+  {
+    "channel": "bugs",
+    "user": "james.csr",
+    "text": "AE notified. NovaStar is unhappy — 3 days of missed webhooks means their automation pipeline was broken silently. They want an SLA credit.",
+    "ts": "1741612200",
+    "thread_id": "thread_b003"
+  },
+  {
+    "channel": "bugs",
+    "user": "marcos.head_eng",
+    "text": "They deserve it. 3-day P1 with no notification from our side = multiple SLA breach credits. Tell AE to offer 30% off next invoice. Let's own this.",
+    "ts": "1741612500",
+    "thread_id": "thread_b003"
+  }
+]
