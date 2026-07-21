@@ -193,6 +193,68 @@ def test_tenant_isolation_over_http():
     assert r.status_code == 409  # no published bundle for tenant
 
 
+def test_ledger_filters_by_bundle_hash_and_date_range():
+    cl = _client()
+    r = cl.post("/v1/decisions/evaluate", headers=AGENT, json={
+        "workflow": "refund", "facts": {"plan_type": "annual", "days_since_purchase": 9},
+        "idempotency_key": "ledger-filter-probe"})
+    assert r.status_code == 200
+    bundle_hash = r.json()["bundle_hash"]
+
+    by_hash = cl.get(f"/v1/ledger?bundle_hash={bundle_hash}", headers=AGENT).json()["events"]
+    assert len(by_hash) >= 1
+    assert all(e["bundle_hash"] == bundle_hash for e in by_hash)
+
+    none_for_bogus = cl.get("/v1/ledger?bundle_hash=sha256:nope", headers=AGENT).json()["events"]
+    assert none_for_bogus == []
+
+    future = "9999-01-01T00:00:00.000+00:00"
+    assert cl.get(f"/v1/ledger?since={future}", headers=AGENT).json()["events"] == []
+    still_there = cl.get(f"/v1/ledger?until={future}", headers=AGENT).json()["events"]
+    assert any(e["idempotency_key"] == "ledger-filter-probe" for e in still_there)
+
+
+def test_bundle_diff_against_active():
+    cl = _client()
+    active = cl.get("/v1/bundles/active", headers=AGENT).json()
+    bundle = active["bundle"]
+    for pol in bundle["policies"]:
+        if pol["id"] == "refund.annual_full_14d":
+            pol["conditions"][1]["value"] = 7  # tighten 14 -> 7
+    draft = cl.post("/v1/bundles/drafts", headers=OWNER, json={"bundle": bundle}).json()
+
+    d = cl.get(f"/v1/bundles/{draft['record_id']}/diff", headers=AGENT)
+    assert d.status_code == 200
+    body = d.json()
+    assert body["baseline_record_id"] is not None
+    diff = body["diff"]
+    assert diff["to_hash"] == draft["content_hash"]
+    assert diff["from_hash"] == active["content_hash"]
+    assert not diff["added"] and not diff["removed"]
+    changed_ids = {m["policy_id"] for m in diff["modified"]}
+    assert "refund.annual_full_14d" in changed_ids
+
+    # the active bundle IS the baseline for itself -> nothing to compare against,
+    # so every one of its own policies is reported relative to no prior state
+    self_diff = cl.get(f"/v1/bundles/{active['record_id']}/diff", headers=AGENT).json()
+    assert self_diff["baseline_record_id"] is None
+    assert self_diff["diff"]["from_hash"] is None
+    assert len(self_diff["diff"]["added"]) == len(active["bundle"]["policies"])
+
+    # diffing a record against itself explicitly IS a real comparison -> empty
+    explicit_self = cl.get(
+        f"/v1/bundles/{active['record_id']}/diff?against={active['record_id']}",
+        headers=AGENT,
+    ).json()
+    assert explicit_self["baseline_record_id"] == active["record_id"]
+    assert explicit_self["diff"]["added"] == [] and explicit_self["diff"]["removed"] == [] \
+        and explicit_self["diff"]["modified"] == []
+
+    assert cl.get("/v1/bundles/does-not-exist/diff", headers=AGENT).status_code == 404
+    assert cl.get(f"/v1/bundles/{draft['record_id']}/diff?against=nope",
+                   headers=AGENT).status_code == 404
+
+
 def test_metrics_endpoint_reflects_decisions():
     cl = _client()
     assert cl.get("/v1/metrics").status_code == 401  # fail-closed like everything else

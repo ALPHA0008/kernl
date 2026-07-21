@@ -49,6 +49,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from pydantic import BaseModel, Field
 
+from backend.bundle.diff import diff_bundles
 from backend.bundle.lifecycle import PublishGateError
 from backend.bundle.schema import Bundle
 from backend.escalation.service import AlreadyResolvedError
@@ -272,12 +273,16 @@ def get_decision(
 def list_ledger(
     workflow: Optional[str] = None,
     outcome: Optional[str] = None,
+    bundle_hash: Optional[str] = None,
+    since: Optional[str] = None,
+    until: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
     p: Principal = Depends(require("agent")),
     c: Container = Depends(get_container),
 ):
     rows = c.ledger.list(p.company_id, workflow=workflow, outcome_kind=outcome,
+                         bundle_hash=bundle_hash, since=since, until=until,
                          limit=min(limit, 200), offset=offset)
     return {"events": [e.model_dump(mode="json") for e in rows]}
 
@@ -334,6 +339,39 @@ def create_draft(
     record = c.lifecycle.save_draft(p.company_id, bundle, created_by=p.key_id)
     return {"record_id": record.record_id, "content_hash": record.content_hash,
             "status": record.status.value}
+
+
+@router.get("/bundles/{record_id}/diff")
+def diff_bundle(
+    record_id: str,
+    against: Optional[str] = None,
+    p: Principal = Depends(require("agent")),
+    c: Container = Depends(get_container),
+):
+    """Structural diff of `record_id` against another bundle -- by default the
+    tenant's currently active (published) bundle, or an explicit `against`
+    record_id. Powers the Policy Workbench's "diff draft vs published" view.
+    This is a content diff (which policies changed), distinct from a replay
+    (which diffs decision *outcomes* on a case set) -- both matter before publish."""
+    record = c.bundles.get(p.company_id, record_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="unknown bundle record")
+
+    if against is not None:
+        baseline = c.bundles.get(p.company_id, against)
+        if baseline is None:
+            raise HTTPException(status_code=404, detail="unknown baseline bundle record")
+    else:
+        baseline = c.lifecycle.active_bundle(p.company_id)
+        if baseline is not None and baseline.record_id == record.record_id:
+            baseline = None  # diffing the active bundle against itself is meaningless
+
+    diff = diff_bundles(baseline.bundle if baseline is not None else None, record.bundle)
+    return {
+        "record_id": record.record_id,
+        "baseline_record_id": baseline.record_id if baseline is not None else None,
+        "diff": diff.model_dump(mode="json"),
+    }
 
 
 @router.post("/bundles/{record_id}/publish")

@@ -97,6 +97,34 @@ export interface ActiveBundle {
   bundle: Bundle;
 }
 
+// ---------------------------------------------------------------- bundle diff
+
+export type PolicyChangeKind = "added" | "removed" | "modified";
+
+export interface PolicyChange {
+  policy_id: string;
+  workflow: string;
+  change: PolicyChangeKind;
+  before: Policy | null;
+  after: Policy | null;
+  changed_fields: string[];
+}
+
+export interface BundleDiff {
+  from_hash: string | null;
+  to_hash: string;
+  added: PolicyChange[];
+  removed: PolicyChange[];
+  modified: PolicyChange[];
+  unchanged_count: number;
+}
+
+export interface BundleDiffResponse {
+  record_id: string;
+  baseline_record_id: string | null;
+  diff: BundleDiff;
+}
+
 // ------------------------------------------------------------------- trace
 
 export interface ConditionResult {
@@ -330,4 +358,20 @@ export interface AssembleResult {
   status: string;
   policy_count: number;
   workflow_count: number;
+}
+
+// -------------------------------------------------------------- api keys
+
+export interface ApiKeySummary {
+  key_id: string;
+  role: "owner" | "approver" | "agent";
+  created_at: string;
+  revoked_at: string | null;
+  active: boolean;
+}
+
+export interface IssuedApiKey {
+  key_id: string;
+  role: "owner" | "approver" | "agent";
+  api_key: string; // plaintext, shown once
 }

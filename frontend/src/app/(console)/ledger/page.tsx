@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorNotice } from "@/components/ui/ErrorNotice";
 import { HashChip } from "@/components/ui/HashChip";
-import { Select } from "@/components/ui/Input";
+import { Input, Select } from "@/components/ui/Input";
 import { OutcomeBadge } from "@/components/ui/OutcomeBadge";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SkeletonTable } from "@/components/ui/Skeleton";
@@ -55,16 +55,33 @@ export default function LedgerPage() {
 
   const [workflow, setWorkflow] = useState("");
   const [outcome, setOutcome] = useState("");
+  const [bundleHash, setBundleHash] = useState("");
+  const [since, setSince] = useState("");
+  const [until, setUntil] = useState("");
+  const [actor, setActor] = useState("");
   const [offset, setOffset] = useState(0);
 
   useEffect(() => {
     let live = true;
-    listLedger(apiKey, { workflow: workflow || undefined, outcome: outcome || undefined, limit: PAGE_SIZE, offset })
+    listLedger(apiKey, {
+      workflow: workflow || undefined,
+      outcome: outcome || undefined,
+      bundle_hash: bundleHash.trim() || undefined,
+      since: since ? new Date(since).toISOString() : undefined,
+      until: until ? new Date(until + "T23:59:59.999Z").toISOString() : undefined,
+      limit: PAGE_SIZE,
+      offset,
+    })
       .then(({ events }) => live && (setEvents(events), setError(null)))
       .catch((e) => live && (setError(e), setEvents([])));
     verifyLedger(apiKey).then((v) => live && setVerify(v)).catch(() => live && setVerify(null));
     return () => { live = false; };
-  }, [apiKey, workflow, outcome, offset]);
+  }, [apiKey, workflow, outcome, bundleHash, since, until, offset]);
+
+  // actor has no indexed column server-side; filter the already-fetched page
+  const visibleEvents = actor.trim()
+    ? events?.filter((e) => `${e.actor.type}:${e.actor.id}`.toLowerCase().includes(actor.trim().toLowerCase())) ?? null
+    : events;
 
   useEffect(() => {
     getActiveBundle(apiKey).then((a) => setWorkflows(a.bundle.workflows.map((w) => w.name))).catch(() => {});
@@ -90,8 +107,8 @@ export default function LedgerPage() {
       <Toolbar
         actions={
           <>
-            <Button variant="secondary" size="sm" disabled={!events?.length} onClick={() => events && exportJson(events)}>Export JSON</Button>
-            <Button variant="secondary" size="sm" disabled={!events?.length} onClick={() => events && exportCsv(events)}>Export CSV</Button>
+            <Button variant="secondary" size="sm" disabled={!visibleEvents?.length} onClick={() => visibleEvents && exportJson(visibleEvents)}>Export JSON</Button>
+            <Button variant="secondary" size="sm" disabled={!visibleEvents?.length} onClick={() => visibleEvents && exportCsv(visibleEvents)}>Export CSV</Button>
           </>
         }
       >
@@ -103,13 +120,44 @@ export default function LedgerPage() {
           <option value="">all outcomes</option>
           {OUTCOME_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
         </Select>
+        <Input
+          value={actor}
+          onChange={(e) => setActor(e.target.value)}
+          placeholder="actor"
+          mono
+          className="!h-8 w-auto min-w-[110px]"
+          aria-label="Filter by actor (this page only)"
+          title="Filters the currently loaded page — actor is not an indexed server-side column"
+        />
+        <Input
+          value={bundleHash}
+          onChange={(e) => { setBundleHash(e.target.value); setOffset(0); }}
+          placeholder="bundle hash"
+          mono
+          className="!h-8 w-auto min-w-[140px]"
+          aria-label="Filter by bundle hash"
+        />
+        <Input
+          type="date"
+          value={since}
+          onChange={(e) => { setSince(e.target.value); setOffset(0); }}
+          className="!h-8 w-auto"
+          aria-label="Since date"
+        />
+        <Input
+          type="date"
+          value={until}
+          onChange={(e) => { setUntil(e.target.value); setOffset(0); }}
+          className="!h-8 w-auto"
+          aria-label="Until date"
+        />
       </Toolbar>
 
       {error ? <ErrorNotice error={error} /> : null}
       {!events && !error ? <SkeletonTable rows={8} cols={8} /> : null}
 
-      {events ? (
-        events.length === 0 ? (
+      {visibleEvents ? (
+        visibleEvents.length === 0 ? (
           <EmptyState
             title={offset > 0 ? "No more events" : "No ledger events match"}
             hint={offset > 0 ? undefined : "Run a decision from Evaluate — every ruling lands here."}
@@ -123,7 +171,7 @@ export default function LedgerPage() {
                 </tr>
               </thead>
               <tbody>
-                {events.map((e) => (
+                {visibleEvents.map((e) => (
                   <tr key={e.event_id}>
                     <td className="whitespace-nowrap text-xs text-body">{fmtDate(e.created_at)}</td>
                     <td className="text-xs">
@@ -145,11 +193,11 @@ export default function LedgerPage() {
         )
       ) : null}
 
-      {events && events.length > 0 ? (
+      {visibleEvents && visibleEvents.length > 0 ? (
         <div className="mt-4 flex items-center justify-between">
           <Button variant="ghost" size="sm" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}>← Newer</Button>
-          <span className="text-xs text-mute">{offset + 1}–{offset + events.length}</span>
-          <Button variant="ghost" size="sm" disabled={events.length < PAGE_SIZE} onClick={() => setOffset(offset + PAGE_SIZE)}>Older →</Button>
+          <span className="text-xs text-mute">{offset + 1}–{offset + visibleEvents.length}</span>
+          <Button variant="ghost" size="sm" disabled={events !== null && events.length < PAGE_SIZE} onClick={() => setOffset(offset + PAGE_SIZE)}>Older →</Button>
         </div>
       ) : null}
     </>

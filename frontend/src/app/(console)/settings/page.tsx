@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { TenantKeys } from "@/components/policy/TenantKeys";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorNotice } from "@/components/ui/ErrorNotice";
@@ -82,6 +83,16 @@ export default function SettingsPage() {
             ))}
           </CardBody>
         </Card>
+      ) : null}
+
+      {principal.role === "owner" ? (
+        <section className="mt-6">
+          <h2 className="t-display-sm mb-2 text-ink">API keys</h2>
+          <p className="mb-3 text-sm text-body">
+            Issue and revoke keys for your own tenant. A new key&rsquo;s plaintext is shown once — rotate by issuing a replacement, then revoking the old key.
+          </p>
+          <TenantKeys apiKey={apiKey} companyId={principal.company_id} />
+        </section>
       ) : null}
 
       {principal.role === "owner" ? (

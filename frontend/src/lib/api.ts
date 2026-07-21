@@ -5,13 +5,16 @@
 
 import type {
   ActiveBundle,
+  ApiKeySummary,
   AssembleResult,
+  BundleDiffResponse,
   BundleSummary,
   ChainVerify,
   DecisionEvent,
   Escalation,
   EvaluateResponse,
   GoldenCase,
+  IssuedApiKey,
   OnboardingDraft,
   Policy,
   PolicyDraft,
@@ -97,11 +100,22 @@ export const getDecision = (key: string, id: string) =>
 
 export const listLedger = (
   key: string,
-  q: { workflow?: string; outcome?: string; limit?: number; offset?: number } = {},
+  q: {
+    workflow?: string;
+    outcome?: string;
+    bundle_hash?: string;
+    since?: string;
+    until?: string;
+    limit?: number;
+    offset?: number;
+  } = {},
 ) => {
   const params = new URLSearchParams();
   if (q.workflow) params.set("workflow", q.workflow);
   if (q.outcome) params.set("outcome", q.outcome);
+  if (q.bundle_hash) params.set("bundle_hash", q.bundle_hash);
+  if (q.since) params.set("since", q.since);
+  if (q.until) params.set("until", q.until);
   if (q.limit !== undefined) params.set("limit", String(q.limit));
   if (q.offset !== undefined) params.set("offset", String(q.offset));
   const qs = params.toString();
@@ -131,6 +145,12 @@ export const publishBundle = (key: string, recordId: string) =>
     key,
     `/v1/bundles/${encodeURIComponent(recordId)}/publish`,
     { method: "POST" },
+  );
+
+export const getBundleDiff = (key: string, recordId: string, against?: string) =>
+  call<BundleDiffResponse>(
+    key,
+    `/v1/bundles/${encodeURIComponent(recordId)}/diff${against ? `?against=${encodeURIComponent(against)}` : ""}`,
   );
 
 export const activateBundle = (key: string, recordId: string) =>
@@ -272,3 +292,21 @@ export const setDraftStatus = (key: string, draftId: string, status: string) =>
 
 export const assembleBundle = (key: string) =>
   call<AssembleResult>(key, "/v1/onboarding/assemble", { method: "POST" });
+
+// ---------------------------------------------------------------- api keys
+
+export const listTenantKeys = (key: string, companyId: string) =>
+  call<{ keys: ApiKeySummary[] }>(key, `/v1/tenants/${encodeURIComponent(companyId)}/keys`);
+
+export const issueTenantKey = (key: string, companyId: string, role: string) =>
+  call<IssuedApiKey>(key, `/v1/tenants/${encodeURIComponent(companyId)}/keys`, {
+    method: "POST",
+    body: { role },
+  });
+
+export const revokeTenantKey = (key: string, companyId: string, keyId: string) =>
+  call<{ key_id: string; revoked_at: string }>(
+    key,
+    `/v1/tenants/${encodeURIComponent(companyId)}/keys/${encodeURIComponent(keyId)}`,
+    { method: "DELETE" },
+  );

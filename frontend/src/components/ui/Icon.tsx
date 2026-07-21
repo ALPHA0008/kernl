@@ -8,6 +8,7 @@ type IconName =
   | "policies"
   | "replay"
   | "onboarding"
+  | "sources"
   | "settings"
   | "search"
   | "chevron-down"
@@ -61,6 +62,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <path d="M8 10.5V3.5M5 6l3-3 3 3" />
       <path d="M3 11v1.5h10V11" />
+    </>
+  ),
+  // stacked documents
+  sources: (
+    <>
+      <path d="M4.5 2.5h5l3 3v8h-8v-11z" />
+      <path d="M2.5 5v8.5h6.5" />
     </>
   ),
   // gear

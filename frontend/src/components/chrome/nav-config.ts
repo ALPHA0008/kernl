@@ -38,6 +38,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Build",
     items: [
       { href: "/onboarding", label: "Onboarding", icon: "onboarding", ownerOnly: true, hint: "Docs → dashboard" },
+      { href: "/sources", label: "Sources", icon: "sources", hint: "Uploaded documents" },
       { href: "/settings", label: "Settings", icon: "settings", hint: "Tenant & session" },
     ],
   },

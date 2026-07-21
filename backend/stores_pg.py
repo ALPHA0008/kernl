@@ -272,6 +272,9 @@ class PgLedgerStore(_Pg):
         company_id: str,
         workflow: Optional[str] = None,
         outcome_kind: Optional[str] = None,
+        bundle_hash: Optional[str] = None,
+        since: Optional[str] = None,
+        until: Optional[str] = None,
         limit: int = 100,
         offset: int = 0,
     ) -> list[DecisionEvent]:
@@ -283,6 +286,15 @@ class PgLedgerStore(_Pg):
         if outcome_kind is not None:
             q.append("AND outcome_kind = %s")
             params.append(outcome_kind)
+        if bundle_hash is not None:
+            q.append("AND bundle_hash = %s")
+            params.append(bundle_hash)
+        if since is not None:
+            q.append("AND created_at >= %s")
+            params.append(since)
+        if until is not None:
+            q.append("AND created_at <= %s")
+            params.append(until)
         q.append("ORDER BY seq DESC LIMIT %s OFFSET %s")
         params.extend([limit, offset])
         with self._tx() as conn, conn.cursor() as cur:

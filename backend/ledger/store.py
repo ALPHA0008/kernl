@@ -34,6 +34,9 @@ class LedgerStore(Protocol):
         company_id: str,
         workflow: Optional[str] = None,
         outcome_kind: Optional[str] = None,
+        bundle_hash: Optional[str] = None,
+        since: Optional[str] = None,
+        until: Optional[str] = None,
         limit: int = 100,
         offset: int = 0,
     ) -> list[DecisionEvent]: ...
@@ -87,6 +90,9 @@ class InMemoryLedgerStore:
         company_id: str,
         workflow: Optional[str] = None,
         outcome_kind: Optional[str] = None,
+        bundle_hash: Optional[str] = None,
+        since: Optional[str] = None,
+        until: Optional[str] = None,
         limit: int = 100,
         offset: int = 0,
     ) -> list[DecisionEvent]:
@@ -96,6 +102,9 @@ class InMemoryLedgerStore:
             for e in stream
             if (workflow is None or e.workflow == workflow)
             and (outcome_kind is None or e.outcome.get("kind") == outcome_kind)
+            and (bundle_hash is None or e.bundle_hash == bundle_hash)
+            and (since is None or e.created_at >= since)
+            and (until is None or e.created_at <= until)
         ]
         rows.reverse()  # newest first
         return rows[offset : offset + limit]

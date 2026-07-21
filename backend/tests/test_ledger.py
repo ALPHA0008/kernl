@@ -195,6 +195,22 @@ def test_list_filters_and_orders_newest_first():
     assert len(only_esc) == 1 and only_esc[0].idempotency_key == "b"
 
 
+def test_list_filters_by_bundle_hash_and_date_range():
+    svc, store = _svc()
+    a, _ = _decide(svc, key="a")
+    b, _ = _decide(svc, key="b", facts={"days_since_purchase": 9})
+
+    by_hash = store.list("acme", bundle_hash=BUNDLE_HASH)
+    assert len(by_hash) == 2  # both decisions share the fixture's bundle_hash
+    assert store.list("acme", bundle_hash="sha256:not-a-real-hash") == []
+
+    assert store.list("acme", since=a.created_at) == store.list("acme")
+    far_future = "9999-01-01T00:00:00.000+00:00"
+    assert store.list("acme", since=far_future) == []
+    assert store.list("acme", until=far_future) == store.list("acme")
+    assert b.created_at >= a.created_at  # sanity: fixture events are chronological
+
+
 def test_tenant_isolation():
     svc, store = _svc()
     _decide(svc, key="a")

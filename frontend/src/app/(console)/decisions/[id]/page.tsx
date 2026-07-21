@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 import { TraceView } from "@/components/trace/TraceView";
 import { BackLink } from "@/components/ui/BackLink";
@@ -11,22 +12,30 @@ import { HashChip } from "@/components/ui/HashChip";
 import { OutcomeBadge } from "@/components/ui/OutcomeBadge";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { evaluate, getActiveBundle, getDecision, listEscalations } from "@/lib/api";
+import { evaluate, getActiveBundle, getDecision, listBundles, listEscalations, runReplay } from "@/lib/api";
 import { useSession } from "@/lib/auth";
 import { fmtDate, newIdempotencyKey } from "@/lib/format";
-import type { DecisionEvent } from "@/lib/types";
+import type { ActiveBundle, BundleSummary, DecisionEvent } from "@/lib/types";
 
 export default function DecisionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { apiKey } = useSession();
+  const { apiKey, principal } = useSession();
+  const router = useRouter();
+  const isOwner = principal.role === "owner";
 
   const [event, setEvent] = useState<DecisionEvent | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [escalationId, setEscalationId] = useState<string | null>(null);
   const [activeHash, setActiveHash] = useState<string | null>(null);
+  const [activeBundle, setActiveBundle] = useState<ActiveBundle | null>(null);
   const [reeval, setReeval] = useState<{ same: boolean } | null>(null);
   const [reevalBusy, setReevalBusy] = useState(false);
   const [reevalError, setReevalError] = useState<unknown>(null);
+
+  const [drafts, setDrafts] = useState<BundleSummary[] | null>(null);
+  const [replayPickerOpen, setReplayPickerOpen] = useState(false);
+  const [replayBusy, setReplayBusy] = useState(false);
+  const [replayError, setReplayError] = useState<unknown>(null);
 
   useEffect(() => {
     getDecision(apiKey, id).then(setEvent).catch(setError);
@@ -36,8 +45,31 @@ export default function DecisionPage({ params }: { params: Promise<{ id: string 
         if (esc) setEscalationId(esc.escalation_id);
       })
       .catch(() => {});
-    getActiveBundle(apiKey).then((a) => setActiveHash(a.content_hash)).catch(() => {});
-  }, [apiKey, id]);
+    getActiveBundle(apiKey)
+      .then((a) => {
+        setActiveHash(a.content_hash);
+        setActiveBundle(a);
+      })
+      .catch(() => {});
+    if (isOwner) {
+      listBundles(apiKey)
+        .then(({ bundles }) => setDrafts(bundles.filter((b) => b.status === "draft")))
+        .catch(() => {});
+    }
+  }, [apiKey, id, isOwner]);
+
+  async function replayAgainstDraft(recordId: string) {
+    setReplayBusy(true);
+    setReplayError(null);
+    try {
+      const run = await runReplay(apiKey, { candidate_record_id: recordId, include_reference: true });
+      router.push(`/replays/${run.run_id}`);
+    } catch (err) {
+      setReplayError(err);
+    } finally {
+      setReplayBusy(false);
+    }
+  }
 
   async function reEvaluate() {
     if (!event) return;
@@ -152,10 +184,43 @@ export default function DecisionPage({ params }: { params: Promise<{ id: string 
             </span>
           ) : null}
           {reevalError ? <ErrorNotice error={reevalError} /> : null}
+
+          {isOwner && drafts && drafts.length > 0 ? (
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setReplayPickerOpen((v) => !v)}
+                title="Run the golden-set replay against a candidate draft bundle"
+              >
+                Replay against draft…
+              </Button>
+              {replayPickerOpen ? (
+                <div className="absolute left-0 top-full z-10 mt-1.5 w-72 rounded-md bg-canvas p-1.5 shadow-[var(--shadow-4)]">
+                  {drafts.map((d) => (
+                    <button
+                      key={d.record_id}
+                      type="button"
+                      disabled={replayBusy}
+                      onClick={() => void replayAgainstDraft(d.record_id)}
+                      className="flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left text-xs hover:bg-canvas-soft disabled:opacity-50"
+                    >
+                      <span className="font-mono text-ink">{d.content_hash.slice(0, 16)}…</span>
+                      <span className="tabular-nums text-mute">{d.policy_count} policies</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          {replayError ? <ErrorNotice error={replayError} /> : null}
         </div>
       </Card>
 
-      <TraceView trace={event.trace} />
+      <TraceView
+        trace={event.trace}
+        policies={sameBundleActive ? activeBundle?.bundle.policies : undefined}
+      />
     </>
   );
 }
