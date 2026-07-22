@@ -4,6 +4,7 @@ import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
 import { ToastProvider } from "@/components/ui/Toast";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export const metadata: Metadata = {
   title: "Kernl Console",
@@ -20,6 +21,7 @@ export default function RootLayout({
         <AuthProvider>
           <ToastProvider>{children}</ToastProvider>
         </AuthProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
