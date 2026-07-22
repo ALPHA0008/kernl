@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@vercel/speed-insights": "^2.0.0",
     "geist": "^1.7.2",
     "next": "16.2.5",
     "react": "19.2.4",
