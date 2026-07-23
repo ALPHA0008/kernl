@@ -1,5 +1,5 @@
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
-import type { Policy, Trace } from "@/lib/types";
+import type { DecisionTrace, Policy } from "@/lib/types";
 
 const STATUS_STYLE: Record<string, string> = {
   matched: "bg-approve-bg text-approve",
@@ -13,8 +13,11 @@ const RESULT_STYLE: Record<string, string> = {
   missing: "text-escalate",
 };
 
-function FactsBlock({ trace }: { trace: Trace }) {
-  const effective = Object.entries(trace.facts_effective);
+function FactsBlock({ trace }: { trace: DecisionTrace }) {
+  // Defensive: a receipt must never crash. Even though a decision trace
+  // always carries facts_effective, guard the null case so a malformed or
+  // future trace shape degrades to the empty state instead of throwing.
+  const effective = Object.entries(trace.facts_effective ?? {});
   return (
     <Card elevation={2}>
       <CardHeader eyebrow="Facts" />
@@ -55,7 +58,7 @@ function FactsBlock({ trace }: { trace: Trace }) {
   );
 }
 
-function PrecedenceBlock({ trace }: { trace: Trace }) {
+function PrecedenceBlock({ trace }: { trace: DecisionTrace }) {
   const p = trace.precedence;
   return (
     <Card elevation={2}>
@@ -103,7 +106,7 @@ function PrecedenceBlock({ trace }: { trace: Trace }) {
   );
 }
 
-function PoliciesBlock({ trace, policies }: { trace: Trace; policies?: Policy[] }) {
+function PoliciesBlock({ trace, policies }: { trace: DecisionTrace; policies?: Policy[] }) {
   const evidenceFor = (policyId: string) => policies?.find((p) => p.id === policyId)?.evidence ?? [];
   return (
     <Card elevation={2}>
@@ -191,7 +194,7 @@ function PoliciesBlock({ trace, policies }: { trace: Trace; policies?: Policy[] 
  *  (the active bundle's policy list, only passed when it matches this trace's
  *  bundle hash exactly) lets each considered policy show its evidence inline —
  *  the "receipt" is incomplete without the citation that justified the rule. */
-export function TraceView({ trace, policies }: { trace: Trace; policies?: Policy[] }) {
+export function TraceView({ trace, policies }: { trace: DecisionTrace; policies?: Policy[] }) {
   return (
     <div className="space-y-4">
       <FactsBlock trace={trace} />

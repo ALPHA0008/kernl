@@ -326,14 +326,15 @@ export default function EvaluatePage() {
               </div>
             </Card>
           ) : (
-            <div className="flex min-h-[280px] flex-col items-center justify-center rounded-lg border border-dashed border-hairline-strong/50 bg-canvas-soft px-6 py-12 text-center">
-              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-canvas shadow-[var(--shadow-1)]">
-                <svg width="18" height="18" viewBox="0 0 18 18" className="text-mute"><path d="M4 9h10M9 4v10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
-              </div>
+            /* Solid-hairline card, not a dashed dropzone: this is a result
+               placeholder, not an upload target. A faint mono line previews
+               the shape of the answer the user is about to get. */
+            <div className="flex min-h-[280px] flex-col items-center justify-center rounded-lg bg-canvas px-6 py-12 text-center shadow-[var(--shadow-1)]">
               <p className="t-body-md font-medium text-ink">No decision yet</p>
               <p className="mt-1.5 max-w-xs text-sm leading-relaxed text-body">
                 Set the facts and evaluate. The outcome and a link to its full trace appear here.
               </p>
+              <p className="mt-4 font-mono text-xs text-mute">outcome · policy · bundle · trace →</p>
             </div>
           )}
         </div>

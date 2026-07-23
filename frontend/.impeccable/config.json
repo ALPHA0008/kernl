@@ -1,0 +1,92 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-font-size",
+        "value": "11px",
+        "createdAt": "2026-07-23T21:28:06.966Z",
+        "reason": "Documented as caption-xs in DESIGN.md (line 476); mono micro-labels"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "10px",
+        "createdAt": "2026-07-23T21:28:08.810Z",
+        "reason": "Documented as caption-2xs in DESIGN.md (line 477); provenance captions"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#0a7c4a",
+        "files": [
+          "src/app/opengraph-image.tsx"
+        ],
+        "createdAt": "2026-07-23T21:28:11.565Z",
+        "reason": "Approve tone in OG ledger row; Satori/edge cannot read OKLCH tokens"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#e9f7ef",
+        "files": [
+          "src/app/opengraph-image.tsx"
+        ],
+        "createdAt": "2026-07-23T21:28:15.599Z",
+        "reason": "Approve tint in OG ledger row; Satori/edge cannot read OKLCH tokens"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "2.5rem",
+        "files": [
+          "src/app/globals.css"
+        ],
+        "createdAt": "2026-07-23T21:33:05.947Z",
+        "reason": "Documented landing display/table-header step in DESIGN.md (lines 474-478)"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "5.5rem",
+        "files": [
+          "src/app/globals.css"
+        ],
+        "createdAt": "2026-07-23T21:33:07.775Z",
+        "reason": "Documented landing display/table-header step in DESIGN.md (lines 474-478)"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "1.875rem",
+        "files": [
+          "src/app/globals.css"
+        ],
+        "createdAt": "2026-07-23T21:33:10.602Z",
+        "reason": "Documented landing display/table-header step in DESIGN.md (lines 474-478)"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "3.5rem",
+        "files": [
+          "src/app/globals.css"
+        ],
+        "createdAt": "2026-07-23T21:33:14.114Z",
+        "reason": "Documented landing display/table-header step in DESIGN.md (lines 474-478)"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "0.68rem",
+        "files": [
+          "src/app/globals.css"
+        ],
+        "createdAt": "2026-07-23T21:33:17.677Z",
+        "reason": "Documented landing display/table-header step in DESIGN.md (lines 474-478)"
+      },
+      {
+        "rule": "design-system-radius",
+        "value": "2px",
+        "files": [
+          "src/app/globals.css"
+        ],
+        "createdAt": "2026-07-23T21:35:09.266Z",
+        "reason": "Pre-existing :focus-visible outline corner rounding; intentional focus-ring detail"
+      }
+    ]
+  }
+}

@@ -21,7 +21,7 @@
      hues, not independently-guessed colors. */
   --color-ink: oklch(0.20 0 0);
   --color-body: oklch(0.42 0 0);
-  --color-mute: oklch(0.63 0 0);
+  --color-mute: oklch(0.55 0 0);
   --color-hairline: oklch(0.94 0 0);
   --color-hairline-strong: oklch(0.71 0 0);
   --color-canvas: oklch(1.00 0 0);
@@ -35,8 +35,10 @@
   --color-link-deep: oklch(0.52 0.189 258.27);
   --color-link-bg-soft: oklch(0.92 0.041 257.51);
 
-  --color-success: oklch(0.57 0.214 258.25);
-  --color-success-fg: oklch(0.57 0.214 258.25);
+  /* success is the same green as `approve` — a positive outcome and a
+     positive system state must not read as two different colors. */
+  --color-success: oklch(0.51 0.109 161.69);
+  --color-success-fg: oklch(0.51 0.109 161.69);
   --color-error: oklch(0.60 0.245 29.23);
   --color-error-soft: oklch(0.90 0.039 14.00);
   --color-error-deep: oklch(0.52 0.212 29.23);
@@ -44,6 +46,7 @@
   --color-warning-soft: oklch(0.96 0.045 84.57);
   --color-warning-deep: oklch(0.55 0.134 53.95);
   --color-violet: oklch(0.49 0.228 300.45);
+  --color-violet-bg: oklch(0.94 0.033 300.45);
   --color-cyan: oklch(0.83 0.133 174.96);
   --color-cyan-deep: oklch(0.71 0.128 173.11);
 
@@ -54,11 +57,25 @@
   --color-deny-bg: oklch(0.90 0.039 14.00);
   --color-escalate: oklch(0.55 0.134 53.95);
   --color-escalate-bg: oklch(0.96 0.045 84.57);
-  --color-route: oklch(0.52 0.189 258.27);
-  --color-route-bg: oklch(0.92 0.041 257.51);
+  /* `route` is violet, NOT blue — blue is reserved for links, and a routed
+     outcome sitting next to hyperlinks must not read as clickable. */
+  --color-route: oklch(0.49 0.228 300.45);
+  --color-route-bg: oklch(0.94 0.033 300.45);
 
   /* ---- radius scale (extends Tailwind's; safe suffixes) ---- */
   --radius-pill: 100px;
+
+  /* ---- motion tokens ----
+     One place for the app's curves and durations so components stop
+     hand-typing cubic-beziers. Crisp-dashboard personality: strong ease-out
+     for entrances, short durations, nothing bouncy. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);      /* strong ease-out for UI entrances */
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);  /* on-screen movement (tab underline) */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);   /* iOS-like drawer slide */
+  --duration-fast: 120ms;                          /* hovers, small feedback */
+  --duration-menu: 150ms;                          /* dropdowns, tabs, toasts */
+  --duration-panel: 200ms;                         /* expansions, page-enter */
+  --duration-drawer: 260ms;                         /* off-canvas drawer */
 }
 
 /* ---- dark mode: same token names, OKLCH values re-tuned for a dark
@@ -76,7 +93,7 @@
   :root {
     --color-ink: oklch(0.96 0 0);
     --color-body: oklch(0.78 0 0);
-    --color-mute: oklch(0.58 0 0);
+    --color-mute: oklch(0.64 0 0);
     --color-hairline: oklch(0.26 0 0);
     --color-hairline-strong: oklch(0.38 0 0);
     --color-canvas: oklch(0.16 0 0);
@@ -90,8 +107,8 @@
     --color-link-deep: oklch(0.76 0.16 258);
     --color-link-bg-soft: oklch(0.28 0.08 258);
 
-    --color-success: oklch(0.68 0.19 258);
-    --color-success-fg: oklch(0.68 0.19 258);
+    --color-success: oklch(0.68 0.14 162);
+    --color-success-fg: oklch(0.68 0.14 162);
     --color-error: oklch(0.66 0.21 29);
     --color-error-soft: oklch(0.26 0.09 20);
     --color-error-deep: oklch(0.74 0.19 29);
@@ -99,6 +116,7 @@
     --color-warning-soft: oklch(0.28 0.07 75);
     --color-warning-deep: oklch(0.70 0.14 60);
     --color-violet: oklch(0.64 0.20 300);
+    --color-violet-bg: oklch(0.28 0.08 300);
     --color-cyan: oklch(0.80 0.14 175);
     --color-cyan-deep: oklch(0.70 0.13 173);
 
@@ -108,15 +126,15 @@
     --color-deny-bg: oklch(0.26 0.09 20);
     --color-escalate: oklch(0.70 0.14 60);
     --color-escalate-bg: oklch(0.28 0.07 75);
-    --color-route: oklch(0.76 0.16 258);
-    --color-route-bg: oklch(0.28 0.08 258);
+    --color-route: oklch(0.64 0.20 300);
+    --color-route-bg: oklch(0.28 0.08 300);
   }
 }
 
 :root.dark {
   --color-ink: oklch(0.96 0 0);
   --color-body: oklch(0.78 0 0);
-  --color-mute: oklch(0.58 0 0);
+  --color-mute: oklch(0.64 0 0);
   --color-hairline: oklch(0.26 0 0);
   --color-hairline-strong: oklch(0.38 0 0);
   --color-canvas: oklch(0.16 0 0);
@@ -130,8 +148,8 @@
   --color-link-deep: oklch(0.76 0.16 258);
   --color-link-bg-soft: oklch(0.28 0.08 258);
 
-  --color-success: oklch(0.68 0.19 258);
-  --color-success-fg: oklch(0.68 0.19 258);
+  --color-success: oklch(0.68 0.14 162);
+  --color-success-fg: oklch(0.68 0.14 162);
   --color-error: oklch(0.66 0.21 29);
   --color-error-soft: oklch(0.26 0.09 20);
   --color-error-deep: oklch(0.74 0.19 29);
@@ -139,6 +157,7 @@
   --color-warning-soft: oklch(0.28 0.07 75);
   --color-warning-deep: oklch(0.70 0.14 60);
   --color-violet: oklch(0.64 0.20 300);
+  --color-violet-bg: oklch(0.28 0.08 300);
   --color-cyan: oklch(0.80 0.14 175);
   --color-cyan-deep: oklch(0.70 0.13 173);
 
@@ -148,15 +167,15 @@
   --color-deny-bg: oklch(0.26 0.09 20);
   --color-escalate: oklch(0.70 0.14 60);
   --color-escalate-bg: oklch(0.28 0.07 75);
-  --color-route: oklch(0.76 0.16 258);
-  --color-route-bg: oklch(0.28 0.08 258);
+  --color-route: oklch(0.64 0.20 300);
+  --color-route-bg: oklch(0.28 0.08 300);
 }
 
 /* explicit .light class always wins, for a future toggle overriding OS dark */
 :root.light {
   --color-ink: oklch(0.20 0 0);
   --color-body: oklch(0.42 0 0);
-  --color-mute: oklch(0.63 0 0);
+  --color-mute: oklch(0.55 0 0);
   --color-hairline: oklch(0.94 0 0);
   --color-hairline-strong: oklch(0.71 0 0);
   --color-canvas: oklch(1.00 0 0);
@@ -170,8 +189,8 @@
   --color-link-deep: oklch(0.52 0.189 258.27);
   --color-link-bg-soft: oklch(0.92 0.041 257.51);
 
-  --color-success: oklch(0.57 0.214 258.25);
-  --color-success-fg: oklch(0.57 0.214 258.25);
+  --color-success: oklch(0.51 0.109 161.69);
+  --color-success-fg: oklch(0.51 0.109 161.69);
   --color-error: oklch(0.60 0.245 29.23);
   --color-error-soft: oklch(0.90 0.039 14.00);
   --color-error-deep: oklch(0.52 0.212 29.23);
@@ -179,6 +198,7 @@
   --color-warning-soft: oklch(0.96 0.045 84.57);
   --color-warning-deep: oklch(0.55 0.134 53.95);
   --color-violet: oklch(0.49 0.228 300.45);
+  --color-violet-bg: oklch(0.94 0.033 300.45);
   --color-cyan: oklch(0.83 0.133 174.96);
   --color-cyan-deep: oklch(0.71 0.128 173.11);
 
@@ -188,8 +208,8 @@
   --color-deny-bg: oklch(0.90 0.039 14.00);
   --color-escalate: oklch(0.55 0.134 53.95);
   --color-escalate-bg: oklch(0.96 0.045 84.57);
-  --color-route: oklch(0.52 0.189 258.27);
-  --color-route-bg: oklch(0.92 0.041 257.51);
+  --color-route: oklch(0.49 0.228 300.45);
+  --color-route-bg: oklch(0.94 0.033 300.45);
 }
 
 /* NOTE: We deliberately do NOT override Tailwind v4's --spacing-* namespace.
@@ -283,6 +303,22 @@ body {
   line-height: 28px;
   letter-spacing: -0.6px;
 }
+/* ---- landing display steps ----
+   Poster-scale extensions of the ramp for the marketing surface only.
+   Fluid via clamp so they never overflow; tracking within the -0.04em floor.
+   Documented in DESIGN.md. */
+.t-display-hero {
+  font-size: clamp(2.5rem, 1.2rem + 5.4vw, 5.5rem); /* 40px → 88px */
+  font-weight: 600;
+  line-height: 1.0;
+  letter-spacing: -0.03em;
+}
+.t-display-section {
+  font-size: clamp(1.875rem, 1.1rem + 3.1vw, 3.5rem); /* 30px → 56px */
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
 .t-body-lg {
   font-size: 18px;
   font-weight: 400;
@@ -320,6 +356,11 @@ body {
   width: 100%;
   border-collapse: collapse;
   font-variant-numeric: tabular-nums;
+  /* Floor so many-column governance tables scroll (inside TableSurface's
+     overflow-x-auto) rather than crush columns to illegibility on narrow
+     viewports. The scroll-fade affordance on TableSurface signals the
+     overflow. */
+  min-width: 640px;
 }
 .table-ledger th {
   font-family: var(--font-mono);
@@ -395,10 +436,214 @@ body {
   }
 }
 .page-enter {
-  animation: page-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  animation: page-in var(--duration-panel) var(--ease-out);
 }
 @media (prefers-reduced-motion: reduce) {
   .page-enter {
     animation: none;
   }
+}
+
+/* ---- tab underline: one indicator that slides between tabs ----
+   Applied only after first paint (the `ready` gate in Tabs.tsx) so the
+   underline appears in place, then transitions on subsequent tab changes.
+   `left`/`width` are cheap here (a 2px-tall bar, no layout of siblings). */
+.tab-underline {
+  transition:
+    left var(--duration-menu) var(--ease-in-out),
+    width var(--duration-menu) var(--ease-in-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tab-underline {
+    transition: none;
+  }
+}
+
+/* ---- menu / dropdown entry: scale from the trigger, not a generic drop ----
+   A popover should look like it came FROM the control that opened it. The
+   caller sets transform-origin to the trigger corner. scale(0.96), never 0. */
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.menu-enter {
+  animation: menu-in var(--duration-menu) var(--ease-out);
+  transform-origin: var(--menu-origin, top right);
+}
+@media (prefers-reduced-motion: reduce) {
+  .menu-enter {
+    animation: menu-in var(--duration-fast) var(--ease-out); /* keep fade, drop scale distance is minor */
+    transform: none;
+  }
+}
+
+/* ---- toast entry: rise from the bottom-right stack ----
+   Toasts stack and are rapidly triggered; a short rise+fade reads as a new
+   item arriving. Kept a keyframe (each toast mounts fresh; there's no
+   mid-flight retarget to preserve for an appended item). */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.toast-enter {
+  animation: toast-in var(--duration-menu) var(--ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast-enter {
+    animation: none;
+  }
+}
+
+/* ============================================================================
+   Landing surface motion (marketing page only)
+   Scarce, communicative, token-driven. Every block has a reduced-motion branch.
+   No animation library: CSS + IntersectionObserver class toggles only.
+   ============================================================================ */
+
+/* Reveal-on-scroll: shared entrance for narrative blocks (IO toggles .in-view) */
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 0.5s var(--ease-out),
+    transform 0.5s var(--ease-out);
+}
+.in-view .reveal,
+.reveal.in-view {
+  opacity: 1;
+  transform: none;
+}
+
+/* Load-rise: above-the-fold entrance on first paint (hero), staggered via
+   inline animation-delay. Animation (not transition) so it runs without JS. */
+@keyframes load-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+.load-rise {
+  opacity: 0;
+  animation: load-rise 0.55s var(--ease-out) forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .load-rise { opacity: 1; animation: none; }
+}
+
+/* Ledger spine: the authored moment. A hairline that fills as time (scroll)
+   passes. Scroll-timeline where supported; a static full line otherwise. */
+.spine-track {
+  background: var(--color-hairline);
+}
+.spine-fill {
+  transform-origin: top;
+  background: var(--color-ink);
+  transform: scaleY(1); /* fallback: full line */
+}
+@supports (animation-timeline: scroll()) {
+  .spine-fill {
+    transform: scaleY(0);
+    animation: spine-grow linear both;
+    animation-timeline: scroll(root block);
+  }
+}
+@keyframes spine-grow {
+  to {
+    transform: scaleY(1);
+  }
+}
+
+/* Hero ledger strip: the live detail. Entries rise and seal in sequence. */
+@keyframes strip-entry {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.strip-row {
+  opacity: 0;
+  animation: strip-entry 0.45s var(--ease-out) forwards;
+}
+.strip-row:nth-child(1) { animation-delay: 0.15s; }
+.strip-row:nth-child(2) { animation-delay: 0.55s; }
+.strip-row:nth-child(3) { animation-delay: 0.95s; }
+@keyframes seal-stamp {
+  0% { opacity: 0; transform: scale(0.9); }
+  60% { opacity: 1; transform: scale(1.04); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.seal-chip {
+  opacity: 0;
+  animation: seal-stamp 0.4s var(--ease-out) forwards;
+  animation-delay: 1.25s;
+}
+
+/* Flow diagram: pulse traveling the path (offset-path set inline per-node) */
+@keyframes flow-pulse {
+  0% { offset-distance: 0%; opacity: 0; }
+  8% { opacity: 1; }
+  92% { opacity: 1; }
+  100% { offset-distance: 100%; opacity: 0; }
+}
+.flow-pulse {
+  animation: flow-pulse 5.5s linear infinite;
+}
+@keyframes flow-draw {
+  to { stroke-dashoffset: 0; }
+}
+.flow-path-anim {
+  stroke-dasharray: var(--len, 400);
+  stroke-dashoffset: var(--len, 400);
+  animation: flow-draw 1s var(--ease-in-out) forwards;
+}
+
+/* Terminal: run lines reveal in sequence when the block enters view */
+.term-line {
+  opacity: 0;
+}
+.in-view .term-line {
+  animation: strip-entry 0.35s var(--ease-out) forwards;
+}
+.in-view .term-line:nth-child(1) { animation-delay: 0.05s; }
+.in-view .term-line:nth-child(2) { animation-delay: 0.18s; }
+.in-view .term-line:nth-child(3) { animation-delay: 0.31s; }
+.in-view .term-line:nth-child(4) { animation-delay: 0.44s; }
+.in-view .term-line:nth-child(5) { animation-delay: 0.6s; }
+
+/* Chain links: connective strokes draw entry-to-entry on reveal */
+.chain-link {
+  stroke-dasharray: 40;
+  stroke-dashoffset: 40;
+}
+.in-view .chain-link {
+  animation: flow-draw 0.5s var(--ease-out) forwards;
+}
+.in-view .chain-link:nth-of-type(1) { animation-delay: 0.2s; }
+.in-view .chain-link:nth-of-type(2) { animation-delay: 0.5s; }
+.in-view .chain-link:nth-of-type(3) { animation-delay: 0.8s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .spine-fill { transform: scaleY(1); animation: none; }
+  .strip-row, .seal-chip { opacity: 1; animation: none; }
+  .flow-pulse { animation: none; opacity: 0; }
+  .flow-path-anim { stroke-dashoffset: 0; animation: none; }
+  .term-line { opacity: 1; }
+  .in-view .term-line { animation: none; }
+  .chain-link { stroke-dashoffset: 0; }
+  .in-view .chain-link { animation: none; }
 }

@@ -37,7 +37,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`page-enter pointer-events-auto rounded-md bg-canvas px-3.5 py-2.5 text-sm text-ink shadow-[var(--shadow-5)] ${KIND_STYLE[t.kind]}`}
+            className={`toast-enter pointer-events-auto rounded-md bg-canvas px-3.5 py-2.5 text-sm text-ink shadow-[var(--shadow-5)] ${KIND_STYLE[t.kind]}`}
           >
             {t.message}
           </div>

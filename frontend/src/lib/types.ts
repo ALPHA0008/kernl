@@ -167,9 +167,14 @@ export interface Outcome {
   escalation_reason: EscalationReason | null;
   missing_facts: string[];
   conflict_between: string[];
+  // present only on adjudication events (a human ruling on an escalation)
+  adjudicated?: boolean;
+  rationale?: string;
 }
 
-export interface Trace {
+/** The trace of a machine decision: the full derivation. Produced by the
+ *  evaluator (backend/runtime/evaluator.py). No `kind` field. */
+export interface DecisionTrace {
   trace_version: string;
   evaluator_version: string;
   workflow: string;
@@ -179,6 +184,26 @@ export interface Trace {
   defaults_applied: string[];
   policies: PolicyEvaluation[];
   precedence: PrecedenceTrace;
+}
+
+/** The trace of a human adjudication (backend/ledger/service.py
+ *  record_adjudication). A DIFFERENT shape: it has no facts/policies/
+ *  precedence — a human ruled, they didn't run the evaluator. It points back
+ *  to the original decision whose full derivation still lives at
+ *  `original_event_id`. Discriminated from DecisionTrace by `kind`. */
+export interface AdjudicationTrace {
+  trace_version: string;
+  kind: "adjudication";
+  original_event_id: string;
+  original_outcome: Outcome;
+}
+
+export type Trace = DecisionTrace | AdjudicationTrace;
+
+/** Narrow a trace to the adjudication shape. Guards every consumer that
+ *  assumes the decision shape (facts_effective / policies / precedence). */
+export function isAdjudicationTrace(t: Trace): t is AdjudicationTrace {
+  return (t as AdjudicationTrace).kind === "adjudication";
 }
 
 // ------------------------------------------------------------------ ledger

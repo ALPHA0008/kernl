@@ -1,0 +1,62 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-font-size",
+        "value": "11px",
+        "createdAt": "2026-07-22T17:37:44.576Z",
+        "reason": "Established micro-label step (version string, avatar initials, badges, schema hints) used across 13 files; consistent incumbent design-system step"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "10px",
+        "createdAt": "2026-07-22T17:37:59.664Z",
+        "reason": "Established caption step for evidence source-span citations; consistent across trace/policy/onboarding"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "0.68rem",
+        "createdAt": "2026-07-22T17:37:59.845Z",
+        "reason": "Table-header mono-caps step (.table-ledger th); single canonical definition"
+      },
+      {
+        "rule": "design-system-radius",
+        "value": "2px",
+        "createdAt": "2026-07-22T17:38:00.045Z",
+        "reason": "Focus-ring + micro-indicator radius; single canonical use in focus-visible + active-nav rail"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/components/trace/TraceView.tsx"
+        ],
+        "createdAt": "2026-07-22T18:16:44.199Z",
+        "reason": "border-l-2 border-ink marks quoted evidence-span citations (italic excerpt + source·span), the app's consistent citation-blockquote treatment, not a decorative accent"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/app/(console)/decisions/[id]/page.tsx"
+        ],
+        "createdAt": "2026-07-22T18:16:44.268Z",
+        "reason": "border-l-2 border-ink marks the adjudication rationale quote, matching the evidence-citation blockquote treatment used across the app"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "2.5rem",
+        "createdAt": "2026-07-23T20:03:44.649Z",
+        "reason": "clamp() min of documented .t-display-hero landing step (DESIGN.md ramp)"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "1.875rem",
+        "createdAt": "2026-07-23T20:03:44.752Z",
+        "reason": "clamp() min of documented .t-display-section landing step (DESIGN.md ramp)"
+      }
+    ]
+  }
+}

@@ -5,10 +5,31 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
 import { ToastProvider } from "@/components/ui/Toast";
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://kernl.dev";
+const DESCRIPTION =
+  "Kernl turns operating policy into deterministic, versioned code. Every decision a human or AI agent makes: authorized, signed, replay-tested, on the record.";
+
 export const metadata: Metadata = {
-  title: "Kernl Console",
-  description:
-    "The Decision Ledger — versioned policy bundles, deterministic decisions, append-only history.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Kernl · The decision ledger for enterprise AI",
+    template: "%s · Kernl",
+  },
+  description: DESCRIPTION,
+  applicationName: "Kernl",
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    url: "/",
+    siteName: "Kernl",
+    title: "Every decision, on the record.",
+    description: DESCRIPTION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Every decision, on the record.",
+    description: DESCRIPTION,
+  },
 };
 
 export default function RootLayout({
