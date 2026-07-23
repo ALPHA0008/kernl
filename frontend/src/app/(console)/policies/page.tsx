@@ -176,7 +176,7 @@ export default function PoliciesPage() {
 
   return (
     <>
-      <PageHeader eyebrow="Govern" title="Policy Workbench" subtitle="The compiled constitution. Published policies are cited, versioned, replay-gated.">
+      <PageHeader eyebrow="Govern" title="Policies" subtitle="The compiled constitution. Published policies are cited, versioned, replay-gated.">
         <span className="flex items-center gap-3">
           {active ? (
             <span className="flex items-center gap-2">

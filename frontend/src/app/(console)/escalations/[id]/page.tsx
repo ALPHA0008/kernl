@@ -21,6 +21,7 @@ import { getActiveBundle, getDecision, getEscalation, resolveEscalation } from "
 import { useSession } from "@/lib/auth";
 import { fmtDate } from "@/lib/format";
 import type { DecisionEvent, Escalation } from "@/lib/types";
+import { isAdjudicationTrace } from "@/lib/types";
 
 const OUTCOME_KINDS = ["approve", "deny", "route", "escalate"] as const;
 
@@ -138,7 +139,25 @@ export default function EscalationDetailPage({ params }: { params: Promise<{ id:
             </CardBody>
           </Card>
 
-          {decision ? <TraceView trace={decision.trace} /> : <Loading label="Loading trace…" />}
+          {decision ? (
+            isAdjudicationTrace(decision.trace) ? (
+              <Card elevation={2}>
+                <CardBody>
+                  <p className="text-sm text-mute">
+                    The originating event is an adjudication, not a machine decision —{" "}
+                    <Link href={`/decisions/${decision.event_id}`} className="text-link underline underline-offset-2">
+                      view its receipt
+                    </Link>
+                    .
+                  </p>
+                </CardBody>
+              </Card>
+            ) : (
+              <TraceView trace={decision.trace} />
+            )
+          ) : (
+            <Loading label="Loading trace…" />
+          )}
         </div>
 
         <div className="lg:sticky lg:top-20 lg:self-start">

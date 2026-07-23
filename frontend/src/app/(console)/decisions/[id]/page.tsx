@@ -16,6 +16,7 @@ import { evaluate, getActiveBundle, getDecision, listBundles, listEscalations, r
 import { useSession } from "@/lib/auth";
 import { fmtDate, newIdempotencyKey } from "@/lib/format";
 import type { ActiveBundle, BundleSummary, DecisionEvent } from "@/lib/types";
+import { isAdjudicationTrace } from "@/lib/types";
 
 export default function DecisionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -110,13 +111,14 @@ export default function DecisionPage({ params }: { params: Promise<{ id: string 
   }
 
   const sameBundleActive = activeHash !== null && activeHash === event.bundle_hash;
+  const isAdjudication = isAdjudicationTrace(event.trace);
 
   return (
     <>
       <BackLink href="/ledger" label="Back to Ledger" />
       <PageHeader
-        eyebrow={event.event_type === "adjudication" ? "Adjudication" : "Decision"}
-        title={event.event_type === "adjudication" ? "Adjudication receipt" : "Decision receipt"}
+        eyebrow={isAdjudication ? "Adjudication" : "Decision"}
+        title={isAdjudication ? "Adjudication receipt" : "Decision receipt"}
         subtitle={`${event.workflow} · ${fmtDate(event.created_at)}`}
       >
         <OutcomeBadge kind={event.outcome.kind} size="lg" />
@@ -165,62 +167,73 @@ export default function DecisionPage({ params }: { params: Promise<{ id: string 
               <Button variant="secondary" size="sm">View escalation</Button>
             </Link>
           ) : null}
-          <Button
-            variant="ghost"
-            size="sm"
-            loading={reevalBusy}
-            onClick={() => void reEvaluate()}
-            title="Re-submit these exact facts against the CURRENT active bundle"
-          >
-            Re-evaluate now
-          </Button>
-          {reeval ? (
-            <span className={`text-xs font-medium ${reeval.same ? "text-approve" : "text-escalate"}`}>
-              {reeval.same
-                ? "✓ identical under active bundle"
-                : sameBundleActive
-                  ? "✗ outcome differs on same bundle — report this"
-                  : "outcome differs — active bundle changed since this decision"}
-            </span>
-          ) : null}
-          {reevalError ? <ErrorNotice error={reevalError} /> : null}
-
-          {isOwner && drafts && drafts.length > 0 ? (
-            <div className="relative">
+          {/* Re-evaluate / replay operate on a decision's facts+bundle. An
+              adjudication is a human ruling with no derivation to re-run, so
+              these actions don't apply to it. */}
+          {!isAdjudication ? (
+            <>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setReplayPickerOpen((v) => !v)}
-                title="Run the golden-set replay against a candidate draft bundle"
+                loading={reevalBusy}
+                onClick={() => void reEvaluate()}
+                title="Re-submit these exact facts against the CURRENT active bundle"
               >
-                Replay against draft…
+                Re-evaluate now
               </Button>
-              {replayPickerOpen ? (
-                <div className="absolute left-0 top-full z-10 mt-1.5 w-72 rounded-md bg-canvas p-1.5 shadow-[var(--shadow-4)]">
-                  {drafts.map((d) => (
-                    <button
-                      key={d.record_id}
-                      type="button"
-                      disabled={replayBusy}
-                      onClick={() => void replayAgainstDraft(d.record_id)}
-                      className="flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left text-xs hover:bg-canvas-soft disabled:opacity-50"
-                    >
-                      <span className="font-mono text-ink">{d.content_hash.slice(0, 16)}…</span>
-                      <span className="tabular-nums text-mute">{d.policy_count} policies</span>
-                    </button>
-                  ))}
+              {reeval ? (
+                <span className={`text-xs font-medium ${reeval.same ? "text-approve" : "text-escalate"}`}>
+                  {reeval.same
+                    ? "✓ identical under active bundle"
+                    : sameBundleActive
+                      ? "✗ outcome differs on same bundle — report this"
+                      : "outcome differs — active bundle changed since this decision"}
+                </span>
+              ) : null}
+              {reevalError ? <ErrorNotice error={reevalError} /> : null}
+
+              {isOwner && drafts && drafts.length > 0 ? (
+                <div className="relative">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setReplayPickerOpen((v) => !v)}
+                    title="Run the golden-set replay against a candidate draft bundle"
+                  >
+                    Replay against draft…
+                  </Button>
+                  {replayPickerOpen ? (
+                    <div className="menu-enter absolute left-0 top-full z-10 mt-1.5 w-72 rounded-md bg-canvas p-1.5 shadow-[var(--shadow-4)]" style={{ ["--menu-origin" as string]: "top left" }}>
+                      {drafts.map((d) => (
+                        <button
+                          key={d.record_id}
+                          type="button"
+                          disabled={replayBusy}
+                          onClick={() => void replayAgainstDraft(d.record_id)}
+                          className="flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left text-xs hover:bg-canvas-soft disabled:opacity-50"
+                        >
+                          <span className="font-mono text-ink">{d.content_hash.slice(0, 16)}…</span>
+                          <span className="tabular-nums text-mute">{d.policy_count} policies</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
-            </div>
+              {replayError ? <ErrorNotice error={replayError} /> : null}
+            </>
           ) : null}
-          {replayError ? <ErrorNotice error={replayError} /> : null}
         </div>
       </Card>
 
-      <TraceView
-        trace={event.trace}
-        policies={sameBundleActive ? activeBundle?.bundle.policies : undefined}
-      />
+      {isAdjudicationTrace(event.trace) ? (
+        <AdjudicationReceipt event={event} trace={event.trace} />
+      ) : (
+        <TraceView
+          trace={event.trace}
+          policies={sameBundleActive ? activeBundle?.bundle.policies : undefined}
+        />
+      )}
     </>
   );
 }
@@ -231,5 +244,60 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
       <dt className="t-eyebrow mb-1">{label}</dt>
       <dd className="text-ink">{value}</dd>
     </div>
+  );
+}
+
+/** An adjudication is a human ruling on an escalation — not a machine
+ *  derivation. It has no facts/policies/precedence of its own; its "why" is
+ *  the adjudicator's rationale, and the full derivation lives on the original
+ *  decision it resolves. This view shows the ruling and routes to that trace,
+ *  rather than trying to render a decision-shaped trace it doesn't have. */
+function AdjudicationReceipt({
+  event,
+  trace,
+}: {
+  event: DecisionEvent;
+  trace: import("@/lib/types").AdjudicationTrace;
+}) {
+  const rationale = event.outcome.rationale;
+  return (
+    <Card elevation={2}>
+      <CardBody>
+        <div className="mb-5 flex items-center gap-2.5">
+          <span className="t-eyebrow">human ruling</span>
+          <span className="font-mono text-xs text-mute">
+            {event.actor.type}:{event.actor.id}
+          </span>
+        </div>
+
+        <dl className="mb-5 grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
+          <Field label="outcome" value={<OutcomeBadge kind={event.outcome.kind} />} />
+          {event.outcome.action ? (
+            <Field label="chosen action" value={<span className="font-mono text-xs text-ink">{event.outcome.action}</span>} />
+          ) : null}
+        </dl>
+
+        <div className="mb-5">
+          <div className="t-eyebrow mb-1.5">rationale</div>
+          {rationale ? (
+            <p className="rounded-md border-l-2 border-ink bg-canvas-soft px-3.5 py-2.5 text-sm italic text-ink">
+              &ldquo;{rationale}&rdquo;
+            </p>
+          ) : (
+            <p className="text-xs text-mute">no rationale recorded</p>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between gap-3 rounded-md bg-canvas-soft px-4 py-3">
+          <div>
+            <div className="t-eyebrow mb-0.5">resolves decision</div>
+            <span className="font-mono text-xs text-mute">{trace.original_event_id.slice(0, 20)}…</span>
+          </div>
+          <Link href={`/decisions/${trace.original_event_id}`}>
+            <Button variant="secondary" size="sm">View original derivation →</Button>
+          </Link>
+        </div>
+      </CardBody>
+    </Card>
   );
 }

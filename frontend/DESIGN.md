@@ -471,6 +471,11 @@ A condensed display sans (`Space Grotesk`) is loaded as a third face for occasio
 | `{typography.body-sm-strong}` | 14px | 500 | 20px | -0.28px | Nav CTA labels, table-row emphasis. |
 | `{typography.caption}` | 12px | 400 | 16px | 0 | Footer secondary lines, badge labels. |
 | `{typography.caption-mono}` | 12px | 400 | 16px | 0 | Section eyebrows and label captions that want a technical voice. |
+| `{typography.display-hero}` | clamp 40→88px | 600 | 1.0 | -0.03em | Landing hero + close. Poster-scale; marketing surface only. Fluid via clamp so it never overflows. |
+| `{typography.display-section}` | clamp 30→56px | 600 | 1.05 | -0.03em | Landing section headlines. Marketing surface only. |
+| `{typography.caption-xs}` | 11px | 400/500 | ~15px | 0 | Console micro-labels: the evaluator version string, avatar initials, status/outcome dot-badges, inline schema hints. A deliberate step below caption for chrome that must not compete with content. |
+| `{typography.caption-2xs}` | 10px | 400 | ~14px | 0 | Evidence source-span captions (`source_id · span N–M`) under quoted excerpts. The smallest step, reserved for provenance metadata that sits beneath the text it annotates. |
+| `{typography.table-header}` | 0.68rem (~10.9px) | 400 | — | 0.04em, uppercase | `.table-ledger th` — mono-caps column headers on `canvas-soft`. |
 | `{typography.code}` | 13px | 400 | 20px | 0 | Inline code, terminal mockups, command snippets. |
 | `{typography.button-md}` | 14px | 500 | 20px | 0 | Small / nav-scale button labels. |
 | `{typography.button-lg}` | 16px | 500 | 24px | 0 | Marketing-scale pill button labels. |

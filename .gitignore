@@ -66,3 +66,10 @@ backend.env
 
 # Rust build artifacts (edge-evaluator)
 /edge-evaluator/target/
+
+# Design/tooling skills (local agent tooling, not product source)
+/.agents/skills/
+/.claude/skills/
+/.codex/
+skills-lock.json
+**/.impeccable/hook.cache.json
