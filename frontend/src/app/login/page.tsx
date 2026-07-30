@@ -208,7 +208,13 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="mt-5 text-center font-mono text-xs text-mute">{API_URL}</p>
+        {/* Which backend this build points at -- useful when running locally
+            against a dev server, but it must never reach production: an
+            unset NEXT_PUBLIC_KERNL_API_URL falls back to 127.0.0.1, which
+            shipped a localhost address onto the live sign-in screen. */}
+        {process.env.NODE_ENV === "development" ? (
+          <p className="mt-5 text-center font-mono text-xs text-mute">{API_URL}</p>
+        ) : null}
       </div>
     </div>
   );

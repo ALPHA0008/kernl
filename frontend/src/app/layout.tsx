@@ -4,8 +4,8 @@ import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
 import { ToastProvider } from "@/components/ui/Toast";
+import { SITE_URL } from "@/lib/site";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://kernl.dev";
 const DESCRIPTION =
   "Kernl turns operating policy into deterministic, versioned code. Every decision a human or AI agent makes: authorized, signed, replay-tested, on the record.";
 

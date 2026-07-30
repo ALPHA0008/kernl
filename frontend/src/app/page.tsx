@@ -9,8 +9,7 @@ import { ReplayArtifact } from "@/components/landing/ReplayArtifact";
 import { ChainVisual } from "@/components/landing/ChainVisual";
 import { Faq, FAQ_ITEMS } from "@/components/landing/Faq";
 import { CTA_DEMO, CTA_PARTNER } from "@/components/landing/cta";
-
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://kernl.dev";
+import { SITE_URL } from "@/lib/site";
 
 /* ── local section helpers (the story lives in one file; artifacts are imported) ── */
 
@@ -52,13 +51,20 @@ export default function LandingPage() {
         "@id": `${SITE_URL}/#website`,
         url: SITE_URL,
         name: "Kernl",
+        inLanguage: "en-US",
         publisher: { "@id": `${SITE_URL}/#org` },
       },
       {
         "@type": "SoftwareApplication",
+        // Anchored into the same graph as Organization/WebSite: without an @id
+        // and a publisher edge this node floats free and search engines cannot
+        // tell it describes the same entity as the rest of the page.
+        "@id": `${SITE_URL}/#software`,
+        url: SITE_URL,
         name: "Kernl",
         applicationCategory: "BusinessApplication",
         operatingSystem: "Web",
+        publisher: { "@id": `${SITE_URL}/#org` },
         description:
           "Kernl turns operating policy into deterministic, versioned code and records every decision as a signed, append-only, replay-tested ledger entry for humans and AI agents.",
         offers: { "@type": "Offer", price: "0", priceCurrency: "USD", description: "Design partner program" },

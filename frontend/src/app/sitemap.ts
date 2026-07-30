@@ -1,11 +1,18 @@
 import type { MetadataRoute } from "next";
+import { SITE_URL } from "@/lib/site";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://kernl.dev";
-
+/** /login is deliberately absent: it is a bare credential form with no unique
+ *  content, and its canonical already points at "/". Listing it here would ask
+ *  Google to index a URL that simultaneously declares itself non-canonical.
+ *  It stays crawlable in robots.txt so the canonical signal is actually seen --
+ *  Disallow-ing it instead would hide that signal and is the worse pattern. */
 export default function sitemap(): MetadataRoute.Sitemap {
-  const now = new Date();
   return [
-    { url: `${SITE_URL}/`, lastModified: now, changeFrequency: "weekly", priority: 1 },
-    { url: `${SITE_URL}/login`, lastModified: now, changeFrequency: "monthly", priority: 0.3 },
+    {
+      url: `${SITE_URL}/`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 1,
+    },
   ];
 }
